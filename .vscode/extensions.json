@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "zixuanchen.vitest-explorer",
+    "matklad.rust-analyzer",
+    "denoland.vscode-deno",
+    "streetsidesoftware.code-spell-checker",
+    "esbenp.prettier-vscode"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "name": "ts-parallel-template",
+  "sideEffects": false,
+  "version": "0.0.1",
+  "description": "",
+  "module": "module/index.js",
+  "main": "lib/index.js",
+  "types": "module/index.d.ts",
+  "source": "./src/index.ts",
+  "scripts": {
+    "start": "vite",
+    "test": "vitest run",
+    "build:wasm": "cd wasm && make build",
+    "build": "pnpm build:wasm && vite build",
+    "doc": "typedoc src/index.ts",
+    "release": "yarn build && standard-version",
+    "typecheck": "tsc --noEmit",
+    "deno-test": "DENO_DIR=\"$PWD/.cache\" deno run -A --quiet --location http://localhost:3000/ --reload http://localhost:3000/deno/run.ts"
+  },
+  "keywords": [
+    "js",
+    "promise",
+    "typescript"
+  ],
+  "license": "ISC",
+  "author": "Zixuan Chen",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zxch3n/ts-boilerplate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zxch3n/ts-boilerplate/issues"
+  },
+  "homepage": "https://github.com/zxch3n/ts-boilerplate#readme",
+  "devDependencies": {
+    "@types/chance": "^1.1.1",
+    "@types/node": "^17.0.23",
+    "@types/react": "^17.0.33",
+    "@types/react-dom": "^17.0.10",
+    "@vitejs/plugin-react": "^1.0.7",
+    "chance": "^1.1.7",
+    "prettier": "^2.3.2",
+    "standard-version": "^9.3.0",
+    "typedoc": "^0.20.28",
+    "typescript": "^4.4.4",
+    "vite": "^2.8.6",
+    "vite-plugin-comlink": "^2.1.0",
+    "vite-plugin-cross-origin-isolation": "^0.1.1",
+    "vite-plugin-worker": "^1.0.5",
+    "vitest": "^0.7.11"
+  },
+  "dependencies": {
+    "comlink": "^4.3.1",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  }
+}

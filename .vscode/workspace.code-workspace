@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../deno"
+		}
+	],
+	"settings": {
+		"importSorter.importStringConfiguration.tabSize": 2
+	}
+}
