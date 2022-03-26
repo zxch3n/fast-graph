@@ -15,7 +15,7 @@
     "doc": "typedoc src/index.ts",
     "release": "yarn build && standard-version",
     "typecheck": "tsc --noEmit",
-    "deno-test": "DENO_DIR=\"$PWD/.cache\" deno run -A --quiet --location http://localhost:3000/ --reload http://localhost:3000/deno/run.ts"
+    "test:deno": "deno run -A ./deno/run.ts"
   },
   "keywords": [
     "js",
