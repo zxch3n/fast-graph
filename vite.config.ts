@@ -25,7 +25,6 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true,
     dir: './test',
   },
 });
