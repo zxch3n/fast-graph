@@ -1,13 +1,14 @@
-[package]
-name = "wasm"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = ["crates/*"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-crate-type = ["cdylib", "rlib"]
+[profile.release]
+#debug = true
+lto = true
+#opt-level = "s"
+codegen-units = 1
+#panic = "abort"
 
-[dependencies]
-wasm-bindgen = "0.2.74"
-rayon = "1.5"
-wasm-bindgen-rayon = "1.0.3"
+[profile.release.package.wasm]
+opt-level = 2
+#opt-level = "s"
+#debugging = true
