@@ -32,6 +32,11 @@ pub enum Node<F: Float, const N: usize, D> {
     },
 }
 
+#[inline]
+fn two_power(n: usize) -> usize {
+    1 << n
+}
+
 impl<F: Float, const N: usize, D> Node<F, N, D> {
     pub fn new_region(bounds: [Bound<F>; N]) -> Self {
         Node::Region {
@@ -97,17 +102,13 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
             Node::Region { bounds, children } => {
                 if children.len() == 0 {
                     let mut children_bounds = vec![];
-                    let mut masks = vec![];
-                    let mut mask = 1 << (N - 1);
-                    for _ in 0..N {
+                    for _ in 0..two_power(N) {
                         children_bounds.push(bounds.clone());
-                        masks.push(mask);
-                        mask >>= 1;
                     }
 
-                    for i in 0..N {
+                    for i in 0..two_power(N) {
                         for j in 0..N {
-                            if (i & masks[j]) > 0 {
+                            if (i & (1 << j)) > 0 {
                                 children_bounds[i][j].min = bounds[j].middle();
                             } else {
                                 children_bounds[i][j].max = bounds[j].middle();
@@ -152,15 +153,15 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
                 children: _,
             } => {
                 let mut index = 0;
-                for i in 0..N {
-                    let m = (bounds[i].min + bounds[i].max) / F::from(2.0).unwrap();
+                for i in (0..N).rev() {
+                    let m = bounds[i].middle();
                     if point[i] > m {
                         index += 1;
                     }
                     index <<= 1;
                 }
 
-                index
+                index >> 1
             }
             _ => panic!(),
         }
@@ -190,6 +191,10 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
 
         let mut should_divide = false;
+        if !self.contains(point.coord()) {
+            panic!();
+        }
+
         match self {
             Node::Point { coord: _, data: _ } => return Err(()),
             Node::Region {
@@ -217,15 +222,16 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
 
             self.divide().unwrap_or(());
             for point in points {
-                let mut node = None;
                 match &*point {
-                    Node::Point { coord, data } => {
-                        node = Some(self.get_leaf_region(&coord));
+                    Node::Point { coord, data: _ } => {
+                        let node = Some(self.get_leaf_region(&coord));
+                        node.unwrap().insert_point(point, max_num);
                     }
-                    Node::Region { bounds, children } => panic!(),
+                    Node::Region {
+                        bounds: _,
+                        children: _,
+                    } => panic!(),
                 }
-
-                node.unwrap().insert_point(point, max_num);
             }
         }
 
@@ -343,25 +349,32 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let mut tree: GenericTree<f64, 2, ()> = GenericTree::new(
+        let mut tree: GenericTree<f64, 2, usize> = GenericTree::new(
             [
                 Bound {
-                    min: 0.0,
-                    max: 1024.0,
+                    min: -10.0,
+                    max: 101.0,
                 },
                 Bound {
-                    min: 0.0,
-                    max: 1024.0,
+                    min: -10.0,
+                    max: 101.0,
                 },
             ],
             0.1,
             10,
         );
 
-        tree.add([0.0, 0.0], ()).unwrap();
-        tree.add([512.0, 512.0], ()).unwrap();
+        for i in 0..100 {
+            for j in 0..100 {
+                tree.add([i as f64, j as f64], i * 100 + j).unwrap();
+            }
+        }
 
-        let a = tree.find_closest(&[2.0, 2.0]).unwrap();
-        assert_eq!(a.coord(), &[0.0, 0.0]);
+        for i in 0..100 {
+            for j in 0..100 {
+                let temp = tree.find_closest(&[i as f64, j as f64]).unwrap();
+                assert_eq!(temp.data(), &(i * 100 + j));
+            }
+        }
     }
 }

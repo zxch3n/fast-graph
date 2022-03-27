@@ -1,5 +1,7 @@
 mod generic_tree;
 
+pub use generic_tree::*;
+
 #[cfg(test)]
 mod tests {
     #[test]
