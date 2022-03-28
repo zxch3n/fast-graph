@@ -251,6 +251,39 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
             _ => panic!(),
         }
     }
+
+    #[cfg(debug_assertions)]
+    fn check(&self) -> Result<(), ()> {
+        match self {
+            Node::Point { coord: _, data: _ } => Ok(()),
+            Node::Region { bounds, children } => {
+                if children.len() == 0 {
+                    for i in 0..N {
+                        assert!(bounds[i].min < bounds[i].max);
+                    }
+                } else {
+                    if self.is_leaf_region() {
+                        for child in children {
+                            assert!(!child.is_region());
+                            assert!(self.contains(child.coord()));
+                        }
+                    } else {
+                        for child in children {
+                            assert!(child.is_region());
+                        }
+
+                        assert_eq!(children.len(), two_power(N));
+                    }
+
+                    for child in children {
+                        child.check()?;
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    }
 }
 
 pub struct GenericTree<F: Float, const N: usize, D> {
@@ -367,6 +400,7 @@ mod tests {
         for i in 0..100 {
             for j in 0..100 {
                 tree.add([i as f64, j as f64], i * 100 + j).unwrap();
+                tree.root.check().unwrap();
             }
         }
 
