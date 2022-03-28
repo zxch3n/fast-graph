@@ -1,9 +1,17 @@
+use std::fmt::Display;
+
 use num::Float;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Bound<F: Float> {
     min: F,
     max: F,
+}
+
+impl<F: Float + Display> Display for Bound<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "[min: {}, max: {}]", self.min, self.max)
+    }
 }
 
 impl<F: Float> Bound<F> {
@@ -359,8 +367,59 @@ impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
 
         min_ans
     }
+
+    pub fn visit<FF>(&self, func: FF) -> ()
+    where
+        FF: Fn(&Node<F, N, D>, usize) -> bool,
+    {
+        let mut stack = vec![(&self.root, 0)];
+        while let Some((node, depth)) = stack.pop() {
+            if func(&node, depth) {
+                return;
+            }
+
+            match node {
+                Node::Point { coord: _, data: _ } => {}
+                Node::Region {
+                    bounds: _,
+                    children,
+                } => {
+                    for child in children {
+                        stack.push((child, depth + 1));
+                    }
+                }
+            }
+        }
+    }
 }
 
+impl<F: Float + Display, const N: usize, D: Display> GenericTree<F, N, D> {
+    fn debug(&self) {
+        let space = String::from(" ");
+        self.visit(|node, depth| match node {
+            Node::Point { coord, data } => {
+                let mut s = String::new();
+                for i in 0..N {
+                    s += &format!("{} ", coord[i]);
+                }
+
+                print!("{}", space.repeat(depth * 4));
+                println!("Point {{coord: {}, data: {}}}", s, data);
+                false
+            }
+            Node::Region { bounds, children } => {
+                let mut s = String::new();
+                for i in 0..N {
+                    s += &format!("{} ", bounds[i]);
+                }
+
+                print!("{}", space.repeat(depth * 4));
+                println!("Region {{bounds: {}, children: {}}}", s, children.len());
+                false
+            }
+        })
+    }
+}
 trait Distance<F: Float> {
     fn dist(&self, another: &Self) -> F;
 }
@@ -379,6 +438,33 @@ impl<F: Float, const N: usize> Distance<F> for [F; N] {
 #[cfg(test)]
 mod tests {
     use super::{Bound, GenericTree};
+    #[test]
+    fn test_debug() {
+        let mut tree: GenericTree<f64, 2, usize> = GenericTree::new(
+            [
+                Bound {
+                    min: -10.0,
+                    max: 101.0,
+                },
+                Bound {
+                    min: -10.0,
+                    max: 101.0,
+                },
+            ],
+            0.1,
+            10,
+        );
+
+        for i in 0..10 {
+            for j in 0..10 {
+                tree.add([(i * 10) as f64, (j * 10) as f64], i * 100 + j)
+                    .unwrap();
+                tree.root.check().unwrap();
+            }
+        }
+
+        tree.debug();
+    }
 
     #[test]
     fn test_add() {
