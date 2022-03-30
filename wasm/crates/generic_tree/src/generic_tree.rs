@@ -1,3 +1,6 @@
+use core::panic;
+use rayon::prelude::*;
+use spmc;
 use std::fmt::Display;
 
 use num::Float;
@@ -28,7 +31,7 @@ impl<F: Float> Bound<F> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Node<F: Float, const N: usize, D> {
     Point {
         coord: [F; N],
@@ -38,6 +41,21 @@ pub enum Node<F: Float, const N: usize, D> {
         bounds: [Bound<F>; N],
         children: Vec<Box<Node<F, N, D>>>,
     },
+}
+
+impl<F: Float, const N: usize, D: Clone> Clone for Node<F, N, D> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Point { coord, data } => Self::Point {
+                coord: coord.clone(),
+                data: data.clone(),
+            },
+            Self::Region { bounds, children } => Self::Region {
+                bounds: bounds.clone(),
+                children: children.clone(),
+            },
+        }
+    }
 }
 
 #[inline]
@@ -193,7 +211,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         node
     }
 
-    fn insert_point(&mut self, point: Box<Self>, max_num: usize) -> Result<(), ()> {
+    fn insert_point(&mut self, point: Box<Self>, max_num: u32) -> Result<(), ()> {
         if !self.is_leaf_region() {
             return Err(());
         }
@@ -210,7 +228,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
                 children,
             } => {
                 children.push(point);
-                if children.len() > max_num {
+                if children.len() > max_num as usize {
                     should_divide = true;
                 }
             }
@@ -260,6 +278,20 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
     }
 
+    pub fn set_data(&mut self, value: D) {
+        match self {
+            Node::Point { coord: _, data } => {
+                *data = value;
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn check(&self) -> Result<(), ()> {
+        Ok(())
+    }
+
     #[cfg(debug_assertions)]
     fn check(&self) -> Result<(), ()> {
         match self {
@@ -292,6 +324,16 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
             }
         }
     }
+
+    fn children(&mut self) -> &mut Vec<Box<Self>> {
+        match self {
+            Node::Point { coord: _, data: _ } => panic!(),
+            Node::Region {
+                bounds: _,
+                children,
+            } => children,
+        }
+    }
 }
 
 pub struct GenericTree<F: Float, const N: usize, D> {
@@ -320,6 +362,20 @@ impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
         }
     }
 
+    pub fn add_node(&mut self, node: Node<F, N, D>) -> Result<(), ()> {
+        self.num += 1;
+        if !self.root.contains(node.coord()) {
+            return Err(());
+        }
+
+        let region = self.root.get_leaf_region(node.coord());
+        region
+            .insert_point(Box::new(node), self.leaf_max_children)
+            .unwrap();
+
+        Ok(())
+    }
+
     pub fn add(&mut self, point: [F; N], data: D) -> Result<(), ()> {
         self.num += 1;
         if !self.root.contains(&point) {
@@ -329,7 +385,7 @@ impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
         let node = self.root.get_leaf_region(&point);
         node.insert_point(
             Box::new(Node::new_point(point, data)),
-            self.leaf_max_children as usize,
+            self.leaf_max_children,
         )
         .unwrap();
 
@@ -424,6 +480,89 @@ trait Distance<F: Float> {
     fn dist(&self, another: &Self) -> F;
 }
 
+impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree<F, N, D> {
+    pub fn new_in_par(
+        nodes: &[Node<F, N, D>],
+        min_dist: F,
+        leaf_max_children: u32,
+    ) -> GenericTree<F, N, D> {
+        let (max, min) = nodes
+            .par_iter()
+            .fold(
+                || ([F::neg_infinity(); N], [F::infinity(); N]),
+                |(mut max_coord, mut min_coord), node| {
+                    let coord = node.coord();
+                    for i in 0..N {
+                        max_coord[i] = max_coord[i].max(coord[i]);
+                        min_coord[i] = min_coord[i].min(coord[i]);
+                    }
+
+                    (max_coord, min_coord)
+                },
+            )
+            .reduce(
+                || ([F::neg_infinity(); N], [F::infinity(); N]),
+                |(max_coord1, min_coord1), (max_coord2, min_coord2)| {
+                    let mut min_coord = [F::neg_infinity(); N];
+                    let mut max_coord = [F::infinity(); N];
+                    for i in 0..N {
+                        min_coord[i] = max_coord1[i].max(max_coord2[i]);
+                        max_coord[i] = min_coord1[i].min(min_coord2[i]);
+                    }
+
+                    (min_coord, max_coord)
+                },
+            );
+
+        let bounds: [Bound<F>; N] = min
+            .into_iter()
+            .zip(max)
+            .map(|(min, max)| Bound { min, max })
+            .collect::<Vec<Bound<F>>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!());
+
+        let mut tree: GenericTree<F, N, D> = GenericTree::new(bounds, min_dist, leaf_max_children);
+        tree.root.divide().unwrap();
+
+        let mut regions = vec![];
+        for child in tree.root.children() {
+            child.divide().unwrap();
+            for grandson in child.children() {
+                regions.push(grandson);
+            }
+        }
+
+        let belong_to: Vec<usize> = nodes
+            .par_iter()
+            .map(|node| {
+                regions
+                    .iter()
+                    .position(|region| region.contains(&node.coord()))
+                    .unwrap()
+            })
+            .collect();
+
+        regions.par_iter_mut().enumerate().for_each(|(i, region)| {
+            let insert_points = nodes
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| belong_to[*j] == i)
+                .map(|(_, node)| node)
+                .collect::<Vec<_>>();
+            for point in insert_points {
+                let coord = point.coord();
+                let leaf = region.get_leaf_region(coord);
+                let new_point = point.clone();
+                leaf.insert_point(Box::new(new_point), leaf_max_children)
+                    .unwrap();
+            }
+        });
+
+        tree
+    }
+}
+
 impl<F: Float, const N: usize> Distance<F> for [F; N] {
     fn dist(&self, another: &Self) -> F {
         let mut square_sum = F::zero();
@@ -437,22 +576,24 @@ impl<F: Float, const N: usize> Distance<F> for [F; N] {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bound, GenericTree};
+    use std::thread;
+
+    use super::{Bound, GenericTree, Node};
     #[test]
     fn test_debug() {
         let mut tree: GenericTree<f64, 2, usize> = GenericTree::new(
             [
                 Bound {
-                    min: -10.0,
+                    min: -1.0,
                     max: 101.0,
                 },
                 Bound {
-                    min: -10.0,
+                    min: -1.0,
                     max: 101.0,
                 },
             ],
             0.1,
-            10,
+            1,
         );
 
         for i in 0..10 {
@@ -496,5 +637,89 @@ mod tests {
                 assert_eq!(temp.data(), &(i * 100 + j));
             }
         }
+    }
+
+    #[test]
+    fn test_spmc() {
+        let (mut tx, rx) = spmc::channel::<&mut Node<f64, 2, usize>>();
+        let mut handles = Vec::new();
+        for n in 0..5 {
+            let rx = rx.clone();
+            handles.push(thread::spawn(move || {
+                let msg = rx.recv().unwrap();
+                println!("worker {} recvd: {}", n, msg.data());
+                msg.set_data(100);
+            }));
+        }
+
+        let mut nodes = vec![
+            Node::<f64, 2, usize>::new_point([4.0, 5.0], 0),
+            Node::<f64, 2, usize>::new_point([4.0, 5.0], 1),
+            Node::<f64, 2, usize>::new_point([4.0, 5.0], 2),
+            Node::<f64, 2, usize>::new_point([4.0, 5.0], 3),
+            Node::<f64, 2, usize>::new_point([4.0, 5.0], 4),
+        ];
+        for i in 0..5 {
+            let node: *mut _ = &mut nodes[i];
+            unsafe {
+                tx.send(&mut *node).unwrap();
+            }
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        for node in nodes {
+            println!("{}", node.data());
+        }
+    }
+
+    #[test]
+    fn test_parallel_inserts() {
+        let mut nodes = vec![];
+        for i in 0..1000 {
+            for j in 0..1000 {
+                nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
+            }
+        }
+
+        let start = std::time::Instant::now();
+        let tree = GenericTree::<f64, 2, usize>::new_in_par(&nodes, 1.0, 10);
+        let duration = start.elapsed();
+        println!("parallel insertion time: {:?}", duration.as_micros());
+    }
+
+    #[test]
+    fn test_single_thread_inserts() {
+        let mut nodes = vec![];
+        for i in 0..1000 {
+            for j in 0..1000 {
+                nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
+            }
+        }
+
+        let mut tree = GenericTree::<f64, 2, usize>::new(
+            [
+                Bound {
+                    min: -1.0,
+                    max: 1001.0,
+                },
+                Bound {
+                    min: -1.0,
+                    max: 1001.0,
+                },
+            ],
+            1.0,
+            10,
+        );
+
+        let start = std::time::Instant::now();
+        for node in nodes.into_iter() {
+            tree.add_node(node).unwrap();
+        }
+
+        let duration = start.elapsed();
+        println!("parallel insertion time: {:?}", duration.as_micros());
     }
 }
