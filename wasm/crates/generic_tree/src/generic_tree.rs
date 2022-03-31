@@ -641,7 +641,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
     }
 
     pub fn new_in_par(
-        nodes: Vec<Node<F, N, D>>,
+        mut nodes: Vec<Box<Node<F, N, D>>>,
         min_dist: F,
         leaf_max_children: u32,
     ) -> GenericTree<F, N, D> {
@@ -683,11 +683,6 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
 
         let mut tree: GenericTree<F, N, D> = GenericTree::new(bounds, min_dist, leaf_max_children);
         tree.num = nodes.len() as u32;
-
-        let mut nodes = nodes
-            .into_iter()
-            .map(|node| Box::new(node))
-            .collect::<Vec<_>>();
 
         run(&mut nodes, &mut tree.root, leaf_max_children);
         std::mem::forget(nodes);
@@ -867,7 +862,7 @@ mod tests {
         let mut nodes = vec![];
         for i in 0..100 {
             for j in 0..100 {
-                nodes.push(Node::new_point([i as f64, j as f64], i * 100 + j));
+                nodes.push(Box::new(Node::new_point([i as f64, j as f64], i * 100 + j)));
             }
         }
 
@@ -949,39 +944,47 @@ fn test_single_thread(bench: &mut Bencher) {
 #[bench]
 fn test_parallel_inserts(bench: &mut Bencher) {
     // M1
-    // 1 thread 1.71ms for 10K nodes
-    // 8 threads 1.34ms for 10K nodes
-    // 1 thread 269ms for 1M nodes / 123ms if data is evenly distributed
-    // 2 threads 200ms for 1M nodes
-    // 4 threads 173ms for 1M nodes
-    // 8 threads 163ms for 1M nodes / 78ms if data is evenly distributed
+    // 1 threads 151.22222222222223ms
+    // 2 threads 87.72222222222223ms
+    // 4 threads 54.333333333333336ms
+    // 8 threads 45.5ms
 
     // AMD Ryzen 9 3900X 12-Core Processor 3.80 GHz
-    // 24 threads 311ms for 1M nodes
-    // 12 threads 305ms for 1M nodes
-    // 8 threads 294ms for 1M nodes
-    // 1 thread 468ms for 1M nodes
 
-    ThreadPoolBuilder::new()
-        .num_threads(12)
-        .build_global()
-        .unwrap();
-    let mut rng = rand::thread_rng();
+    for thread_num in [1, 2, 4, 8] {
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(thread_num)
+            .build()
+            .unwrap();
+        pool.install(|| {
+            let mut rng = rand::thread_rng();
 
-    bench.iter(black_box(|| {
-        // let start = Instant::now();
-        let mut nodes = vec![];
-        for i in 0..1000 {
-            for j in 0..1000 {
-                nodes.push(Node::new_point(
-                    [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
-                    i * 1000 + j,
-                ));
+            // let start = Instant::now();
+            let mut nodes = vec![];
+            for i in 0..1000 {
+                for j in 0..1000 {
+                    nodes.push(Box::new(Node::new_point(
+                        [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
+                        i * 1000 + j,
+                    )));
+                }
             }
-        }
 
-        // 26ms
-        // println!("Duration {}", start.elapsed().as_millis());
-        GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
-    }));
+            let mut durations = vec![];
+            let mut temp = vec![];
+            for _ in 0..20 {
+                let nodes = nodes.clone();
+                let start = Instant::now();
+                let tree = GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
+                let duration = start.elapsed().as_millis();
+                durations.push(duration);
+                temp.push(tree.num);
+            }
+
+            durations.sort();
+            let slice = &durations[1..durations.len() - 1];
+            let avg = (slice.iter().sum::<u128>() as f64) / (slice.len() as f64);
+            println!("{} threads {}ms", thread_num, avg);
+        })
+    }
 }
