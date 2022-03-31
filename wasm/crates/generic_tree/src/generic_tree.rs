@@ -1,6 +1,8 @@
 use core::panic;
+use rand::Rng;
 use rayon::{join, prelude::*, ThreadPoolBuilder};
 use std::{fmt::Display, time::Instant};
+extern crate rand;
 extern crate test;
 use test::{black_box, Bencher};
 
@@ -252,6 +254,18 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
 
         Ok(())
+    }
+
+    fn insert_point_directly(&mut self, point: Box<Self>) {
+        match self {
+            Node::Point { coord: _, data: _ } => {}
+            Node::Region {
+                bounds: _,
+                children,
+            } => {
+                children.push(point);
+            }
+        }
     }
 
     fn insert_point(&mut self, point: Box<Self>, max_num: u32) -> Result<(), ()> {
@@ -538,8 +552,96 @@ trait Distance<F: Float> {
 }
 
 impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree<F, N, D> {
+    pub fn from_nodes(nodes: Vec<Node<F, N, D>>, min_dist: F, leaf_max_children: u32) -> Self {
+        let (max, min) = nodes.iter().fold(
+            ([F::neg_infinity(); N], [F::infinity(); N]),
+            |(mut max_coord, mut min_coord), node| {
+                let coord = node.coord();
+                for i in 0..N {
+                    max_coord[i] = max_coord[i].max(coord[i]);
+                    min_coord[i] = min_coord[i].min(coord[i]);
+                }
+
+                (max_coord, min_coord)
+            },
+        );
+
+        let bounds: [Bound<F>; N] = min
+            .into_iter()
+            .zip(max)
+            .map(|(min, max)| Bound { min, max })
+            .collect::<Vec<Bound<F>>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!());
+
+        let mut tree: GenericTree<F, N, D> = GenericTree::new(bounds, min_dist, leaf_max_children);
+        tree.num = nodes.len() as u32;
+
+        let mut nodes = nodes
+            .into_iter()
+            .map(|node| Box::new(node))
+            .collect::<Vec<_>>();
+
+        run(&mut nodes, &mut tree.root, leaf_max_children);
+        std::mem::forget(nodes);
+        return tree;
+
+        fn run<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            nodes: &mut [Box<Node<F, N, D>>],
+            leaf: &mut Node<F, N, D>,
+            leaf_max_children: u32,
+        ) {
+            if leaf.children().len() + nodes.len() <= leaf_max_children as usize {
+                for node in nodes {
+                    let node: *const Box<Node<F, N, D>> = &*node;
+                    unsafe {
+                        leaf.insert_point_directly(std::ptr::read(node));
+                    }
+                }
+            } else {
+                let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
+                leaf.divide().unwrap_or(());
+                leaf.children()
+                    .into_iter()
+                    .zip(sub_nodes)
+                    .for_each(|(child, nodes)| run(nodes, child, leaf_max_children));
+            }
+        }
+
+        fn divide<'a, F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            nodes: &'a mut [Box<Node<F, N, D>>],
+            bounds: &[Bound<F>; N],
+            bound_index: usize,
+        ) -> Vec<&'a mut [Box<Node<F, N, D>>]> {
+            let mut ans = vec![];
+            let middle = bounds[bound_index].middle();
+            let mut lt_end_index = 0;
+            for i in 0..nodes.len() {
+                if nodes[i].coord()[bound_index] < middle {
+                    nodes.swap(i, lt_end_index);
+                    lt_end_index += 1;
+                }
+            }
+
+            let (left, right) = nodes.split_at_mut(lt_end_index);
+            if bound_index != 0 {
+                let (left, right) = (
+                    divide(left, bounds, bound_index - 1),
+                    divide(right, bounds, bound_index - 1),
+                );
+                ans = left;
+                ans.extend(right);
+            } else {
+                ans.push(left);
+                ans.push(right);
+            }
+
+            ans
+        }
+    }
+
     pub fn new_in_par(
-        nodes: &[Node<F, N, D>],
+        nodes: Vec<Node<F, N, D>>,
         min_dist: F,
         leaf_max_children: u32,
     ) -> GenericTree<F, N, D> {
@@ -583,8 +685,8 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
         tree.num = nodes.len() as u32;
 
         let mut nodes = nodes
-            .iter()
-            .map(|node| Box::new(node.clone()))
+            .into_iter()
+            .map(|node| Box::new(node))
             .collect::<Vec<_>>();
 
         run(&mut nodes, &mut tree.root, leaf_max_children);
@@ -602,8 +704,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
                 for node in nodes {
                     let node: *const Box<Node<F, N, D>> = &*node;
                     unsafe {
-                        leaf.insert_point(std::ptr::read(node), leaf_max_children)
-                            .unwrap();
+                        leaf.insert_point_directly(std::ptr::read(node));
                     }
                 }
             } else {
@@ -770,7 +871,7 @@ mod tests {
             }
         }
 
-        let tree = GenericTree::<f64, 2, usize>::new_in_par(&nodes, 1.0, 10);
+        let tree = GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
         tree.root.check().unwrap();
         for i in 0..100 {
             for j in 0..100 {
@@ -786,16 +887,21 @@ mod tests {
     }
 
     extern crate test;
+    use rand::Rng;
     use test::{black_box, Bencher};
     #[bench]
     fn test_single_thread_inserts(bench: &mut Bencher) {
-        // 167ms in release build
+        // 579ms on random data / 167ms if data is evenly distributed
 
         bench.iter(black_box(|| {
             let mut nodes = vec![];
+            let mut rng = rand::thread_rng();
             for i in 0..1000 {
                 for j in 0..1000 {
-                    nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
+                    nodes.push(Node::new_point(
+                        [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
+                        i * 1000 + j,
+                    ));
                 }
             }
             let mut tree = GenericTree::<f64, 2, usize>::new(
@@ -821,28 +927,50 @@ mod tests {
 }
 
 #[bench]
+fn test_single_thread(bench: &mut Bencher) {
+    // 266ms, rayon is almost no overhead! damn!
+    let mut rng = rand::thread_rng();
+    bench.iter(black_box(|| {
+        let mut nodes = vec![];
+        for i in 0..1000 {
+            for j in 0..1000 {
+                nodes.push(Node::new_point(
+                    [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
+                    i * 1000 + j,
+                ));
+            }
+        }
+
+        GenericTree::<f64, 2, usize>::from_nodes(nodes, 1.0, 10);
+    }));
+}
+
+#[bench]
 fn test_parallel_inserts(bench: &mut Bencher) {
-    // 123ms 1 thread for 1M nodes
-    // 93ms 2 threads for 1M nodes
-    // 80ms 4 threads for 1M nodes
-    // 79ms 8 threads for 1M nodes
-    // 737ms 8 threads for 10M nodes
+    // 1 thread 1.71ms for 10K nodes
+    // 8 thread 1.34ms for 10K nodes
+    // 1 thread 269ms for 1M nodes / 123ms if data is evenly distributed
+    // 2 thread 200ms for 1M nodes
+    // 4 thread 173ms for 1M nodes
+    // 8 thread 163ms for 1M nodes / 78ms if data is evenly distributed
 
     ThreadPoolBuilder::new()
-        .num_threads(8)
+        .num_threads(2)
         .build_global()
         .unwrap();
-    let mut nodes = vec![];
-    for i in 0..1000 {
-        for j in 0..1000 {
-            nodes.push(Node::new_point(
-                [(i as f64) / 10.0, (j as f64) / 10.],
-                i * 1000 + j,
-            ));
-        }
-    }
+    let mut rng = rand::thread_rng();
 
     bench.iter(black_box(|| {
-        GenericTree::<f64, 2, usize>::new_in_par(&nodes, 1.0, 10);
+        let mut nodes = vec![];
+        for i in 0..1000 {
+            for j in 0..1000 {
+                nodes.push(Node::new_point(
+                    [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
+                    i * 1000 + j,
+                ));
+            }
+        }
+
+        GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
     }));
 }
