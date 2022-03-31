@@ -1,11 +1,15 @@
 use core::panic;
-use rayon::prelude::*;
-use std::fmt::Display;
+use rayon::{join, prelude::*, ThreadPoolBuilder};
+use std::{fmt::Display, time::Instant};
 extern crate test;
 use test::{black_box, Bencher};
 
 use num::Float;
 
+/// Bounds
+///
+///
+///
 #[derive(Clone, Copy, Debug)]
 pub struct Bound<F: Float> {
     min: F,
@@ -32,6 +36,20 @@ impl<F: Float> Bound<F> {
     }
 }
 
+/// Node
+/// ------------
+///
+/// How does the coord work?
+///
+/// <img src="https://i.ibb.co/mcTpnF2/image.png" width="300"/>
+///
+/// let m represent the middle of the bound. how do we infer a region's index in parent.children?
+///
+/// ```txt
+/// (x, y, z)
+/// -> (t0 = x>m0, t1 = y>m1, t2 = z>m2)
+/// -> t0 + 2*t1 + 4*t2
+/// ```
 #[derive(Debug)]
 pub enum Node<F: Float, const N: usize, D> {
     Point {
@@ -173,6 +191,17 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
     }
 
+    pub fn get_child_region_index(point: &[F; N], bounds: &[Bound<F>; N]) -> usize {
+        let mut index = 0;
+        for i in 0..N {
+            if point[i] > bounds[i].middle() {
+                index = index + (1 << i);
+            }
+        }
+
+        index
+    }
+
     pub fn get_sub_region(&self, point: &[F; N]) -> usize {
         match self {
             Node::Region {
@@ -210,6 +239,19 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
 
         node
+    }
+
+    fn insert_points(&mut self, points: Vec<Box<Self>>, max_num: u32) -> Result<(), ()> {
+        for point in points.into_iter() {
+            if !self.contains(point.coord()) {
+                return Err(());
+            }
+
+            let region = self.get_leaf_region(point.coord());
+            region.insert_point(point, max_num).unwrap();
+        }
+
+        Ok(())
     }
 
     fn insert_point(&mut self, point: Box<Self>, max_num: u32) -> Result<(), ()> {
@@ -265,14 +307,21 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         Ok(())
     }
 
-    pub fn coord(&self) -> &[F; N] {
+    pub fn bounds(&self) -> &[Bound<F>; N] {
+        match self {
+            Node::Point { coord, data } => panic!(),
+            Node::Region { bounds, children } => bounds,
+        }
+    }
+
+    fn coord(&self) -> &[F; N] {
         match self {
             Node::Point { coord, data: _ } => coord,
             _ => panic!(),
         }
     }
 
-    pub fn data(&self) -> &D {
+    fn data(&self) -> &D {
         match self {
             Node::Point { coord: _, data } => data,
             _ => panic!(),
@@ -531,43 +580,84 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
             .unwrap_or_else(|_| panic!());
 
         let mut tree: GenericTree<F, N, D> = GenericTree::new(bounds, min_dist, leaf_max_children);
-        tree.root.divide().unwrap();
+        tree.num = nodes.len() as u32;
 
-        let mut regions = vec![];
-        for child in tree.root.children() {
-            child.divide().unwrap();
-            for grandson in child.children() {
-                regions.push(grandson);
+        let mut nodes = nodes
+            .iter()
+            .map(|node| Box::new(node.clone()))
+            .collect::<Vec<_>>();
+
+        run(&mut nodes, &mut tree.root, leaf_max_children);
+        std::mem::forget(nodes);
+        return tree;
+
+        fn run<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            mut nodes: &mut [Box<Node<F, N, D>>],
+            leaf: &mut Node<F, N, D>,
+            leaf_max_children: u32,
+        ) {
+            debug_assert!(leaf.is_leaf_region());
+
+            if leaf.children().len() + nodes.len() <= leaf_max_children as usize {
+                for node in nodes {
+                    let node: *const Box<Node<F, N, D>> = &*node;
+                    unsafe {
+                        leaf.insert_point(std::ptr::read(node), leaf_max_children)
+                            .unwrap();
+                    }
+                }
+            } else {
+                let split_pos = divide(nodes, leaf.bounds(), N - 1);
+                let mut prev = 0;
+                let mut sub_nodes = vec![];
+                debug_assert!(split_pos.len() == (1 << N) - 1);
+                for i in 0..split_pos.len() {
+                    let cur = split_pos[i];
+                    let (left, right) = nodes.split_at_mut(cur - prev);
+                    nodes = right;
+                    sub_nodes.push(left);
+                    prev = cur;
+                }
+
+                sub_nodes.push(nodes);
+                leaf.divide().unwrap_or(());
+                leaf.children()
+                    .into_par_iter()
+                    .zip(sub_nodes)
+                    .for_each(|(child, nodes)| run(nodes, child, leaf_max_children));
             }
         }
 
-        let belong_to: Vec<usize> = nodes
-            .par_iter()
-            .map(|node| {
-                regions
-                    .iter()
-                    .position(|region| region.contains(&node.coord()))
-                    .unwrap()
-            })
-            .collect();
-
-        regions.par_iter_mut().enumerate().for_each(|(i, region)| {
-            let insert_points = nodes
-                .iter()
-                .enumerate()
-                .filter(|(j, _)| belong_to[*j] == i)
-                .map(|(_, node)| node)
-                .collect::<Vec<_>>();
-            for point in insert_points {
-                let coord = point.coord();
-                let leaf = region.get_leaf_region(coord);
-                let new_point = point.clone();
-                leaf.insert_point(Box::new(new_point), leaf_max_children)
-                    .unwrap();
+        fn divide<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            nodes: &mut [Box<Node<F, N, D>>],
+            bounds: &[Bound<F>; N],
+            bound_index: usize,
+        ) -> Vec<usize> {
+            let mut ans = vec![];
+            let middle = bounds[bound_index].middle();
+            let mut lt_end_index = 0;
+            for i in 0..nodes.len() {
+                if nodes[i].coord()[bound_index] < middle {
+                    nodes.swap(i, lt_end_index);
+                    lt_end_index += 1;
+                }
             }
-        });
 
-        tree
+            if bound_index != 0 {
+                let (left, right) = nodes.split_at_mut(lt_end_index);
+                let (left, right) = join(
+                    || divide(left, bounds, bound_index - 1),
+                    || divide(right, bounds, bound_index - 1),
+                );
+                ans = left;
+                ans.push(lt_end_index);
+                ans.extend(right.into_iter().map(|x| x + lt_end_index));
+            } else {
+                ans.push(lt_end_index);
+            }
+
+            ans
+        }
     }
 }
 
@@ -683,6 +773,30 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_parallel_inserts() {
+        let mut nodes = vec![];
+        for i in 0..100 {
+            for j in 0..100 {
+                nodes.push(Node::new_point([i as f64, j as f64], i * 100 + j));
+            }
+        }
+
+        let tree = GenericTree::<f64, 2, usize>::new_in_par(&nodes, 1.0, 10);
+        tree.root.check().unwrap();
+        for i in 0..100 {
+            for j in 0..100 {
+                assert_eq!(
+                    *tree
+                        .find_closest_with_max_dist(&[i as f64, j as f64], 2.0)
+                        .unwrap()
+                        .data(),
+                    i * 100 + j
+                );
+            }
+        }
+    }
+
     extern crate test;
     use test::{black_box, Bencher};
     #[bench]
@@ -720,11 +834,23 @@ mod tests {
 
 #[bench]
 fn test_parallel_inserts(bench: &mut Bencher) {
-    // 71ms in release build
+    // 123ms 1 thread for 1M nodes
+    // 93ms 2 threads for 1M nodes
+    // 80ms 4 threads for 1M nodes
+    // 79ms 8 threads for 1M nodes
+    // 737ms 8 threads for 10M nodes
+
+    ThreadPoolBuilder::new()
+        .num_threads(8)
+        .build_global()
+        .unwrap();
     let mut nodes = vec![];
     for i in 0..1000 {
         for j in 0..1000 {
-            nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
+            nodes.push(Node::new_point(
+                [(i as f64) / 10.0, (j as f64) / 10.],
+                i * 1000 + j,
+            ));
         }
     }
 
