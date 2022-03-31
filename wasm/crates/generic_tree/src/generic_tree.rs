@@ -929,6 +929,7 @@ mod tests {
 #[bench]
 fn test_single_thread(bench: &mut Bencher) {
     // 266ms, rayon is almost no overhead! damn!
+    // 464ms on Ryzen
     let mut rng = rand::thread_rng();
     bench.iter(black_box(|| {
         let mut nodes = vec![];
@@ -947,20 +948,28 @@ fn test_single_thread(bench: &mut Bencher) {
 
 #[bench]
 fn test_parallel_inserts(bench: &mut Bencher) {
+    // M1
     // 1 thread 1.71ms for 10K nodes
-    // 8 thread 1.34ms for 10K nodes
+    // 8 threads 1.34ms for 10K nodes
     // 1 thread 269ms for 1M nodes / 123ms if data is evenly distributed
-    // 2 thread 200ms for 1M nodes
-    // 4 thread 173ms for 1M nodes
-    // 8 thread 163ms for 1M nodes / 78ms if data is evenly distributed
+    // 2 threads 200ms for 1M nodes
+    // 4 threads 173ms for 1M nodes
+    // 8 threads 163ms for 1M nodes / 78ms if data is evenly distributed
+
+    // AMD Ryzen 9 3900X 12-Core Processor 3.80 GHz
+    // 24 threads 311ms for 1M nodes
+    // 12 threads 305ms for 1M nodes
+    // 8 threads 294ms for 1M nodes
+    // 1 thread 468ms for 1M nodes
 
     ThreadPoolBuilder::new()
-        .num_threads(2)
+        .num_threads(12)
         .build_global()
         .unwrap();
     let mut rng = rand::thread_rng();
 
     bench.iter(black_box(|| {
+        // let start = Instant::now();
         let mut nodes = vec![];
         for i in 0..1000 {
             for j in 0..1000 {
@@ -971,6 +980,8 @@ fn test_parallel_inserts(bench: &mut Bencher) {
             }
         }
 
+        // 26ms
+        // println!("Duration {}", start.elapsed().as_millis());
         GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
     }));
 }

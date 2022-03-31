@@ -10,3 +10,9 @@ num = "0.4.0"
 rayon = "1.5"
 spmc = "0.3.0"
 rand = "0.8.5"
+
+[profile.dev]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
