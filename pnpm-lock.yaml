@@ -14,11 +14,11 @@ specifiers:
   standard-version: ^9.3.0
   typedoc: ^0.20.28
   typescript: ^4.4.4
-  vite: ^2.8.6
+  vite: ^2.9.0
   vite-plugin-comlink: ^2.1.0
   vite-plugin-cross-origin-isolation: ^0.1.1
   vite-plugin-worker: ^1.0.5
-  vitest: ^0.7.11
+  vitest: ^0.8.1
 
 dependencies:
   comlink: registry.npmmirror.com/comlink/4.3.1
@@ -36,11 +36,11 @@ devDependencies:
   standard-version: registry.npmmirror.com/standard-version/9.3.2
   typedoc: registry.npmmirror.com/typedoc/0.20.37_typescript@4.5.3
   typescript: registry.npmmirror.com/typescript/4.5.3
-  vite: registry.npmmirror.com/vite/2.8.6
-  vite-plugin-comlink: registry.npmmirror.com/vite-plugin-comlink/2.1.0_comlink@4.3.1+vite@2.8.6
+  vite: registry.npmmirror.com/vite/2.9.0
+  vite-plugin-comlink: registry.npmmirror.com/vite-plugin-comlink/2.1.0_comlink@4.3.1+vite@2.9.0
   vite-plugin-cross-origin-isolation: registry.npmmirror.com/vite-plugin-cross-origin-isolation/0.1.1
-  vite-plugin-worker: 1.0.5_typescript@4.5.3+vite@2.8.6
-  vitest: registry.npmmirror.com/vitest/0.7.11
+  vite-plugin-worker: 1.0.5_typescript@4.5.3+vite@2.9.0
+  vitest: registry.npmmirror.com/vitest/0.8.1
 
 packages:
 
@@ -610,23 +610,23 @@ packages:
       - ts-node
     dev: true
 
-  /vite-plugin-bundle/1.0.1_vite@2.8.6:
+  /vite-plugin-bundle/1.0.1_vite@2.9.0:
     resolution: {integrity: sha512-7K+tieFUlZ21/A57HNmiOJpHkknm2FcgeJj/4f4Rdf5hbDhGOTPP2kqmlSX/B6lTJNIVdlSG7Q4OC7gClv3QrQ==}
     peerDependencies:
       vite: ^2.5.1
     dependencies:
       magic-string: 0.25.7
-      vite: registry.npmmirror.com/vite/2.8.6
+      vite: registry.npmmirror.com/vite/2.9.0
     dev: true
 
-  /vite-plugin-worker/1.0.5_typescript@4.5.3+vite@2.8.6:
+  /vite-plugin-worker/1.0.5_typescript@4.5.3+vite@2.9.0:
     resolution: {integrity: sha512-g7rW0YgQorRsiRV4YUxliqvEq2UIx0ZcBCZnosaJdffDbxMnYhJQQ+Jo6q7PLpwvZK5O3ldzia/wUlXJVm+iGw==}
     peerDependencies:
       vite: ^2.5.0
     dependencies:
       tsup: 5.11.1_typescript@4.5.3
-      vite: registry.npmmirror.com/vite/2.8.6
-      vite-plugin-bundle: 1.0.1_vite@2.8.6
+      vite: registry.npmmirror.com/vite/2.9.0
+      vite-plugin-bundle: 1.0.1_vite@2.9.0
     transitivePeerDependencies:
       - supports-color
       - ts-node
@@ -3409,7 +3409,7 @@ packages:
     dev: true
 
   registry.npmmirror.com/rollup/2.61.1:
-    resolution: {integrity: sha512-BbTXlEvB8d+XFbK/7E5doIcRtxWPRiqr0eb5vQ0+2paMM04Ye4PZY5nHOQef2ix24l/L0SpLd5hwcH15QHPdvA==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/rollup/download/rollup-2.61.1.tgz}
+    resolution: {integrity: sha512-BbTXlEvB8d+XFbK/7E5doIcRtxWPRiqr0eb5vQ0+2paMM04Ye4PZY5nHOQef2ix24l/L0SpLd5hwcH15QHPdvA==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/rollup/-/rollup-2.61.1.tgz}
     name: rollup
     version: 2.61.1
     engines: {node: '>=10.0.0'}
@@ -3609,7 +3609,7 @@ packages:
     dev: true
     optional: true
 
-  registry.npmmirror.com/vite-plugin-comlink/2.1.0_comlink@4.3.1+vite@2.8.6:
+  registry.npmmirror.com/vite-plugin-comlink/2.1.0_comlink@4.3.1+vite@2.9.0:
     resolution: {integrity: sha1-k9rOQXFDmphc36X9hJA5VEaclmk=, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/vite-plugin-comlink/download/vite-plugin-comlink-2.1.0.tgz}
     id: registry.npmmirror.com/vite-plugin-comlink/2.1.0
     name: vite-plugin-comlink
@@ -3619,7 +3619,7 @@ packages:
       vite: ^2.5.0
     dependencies:
       comlink: registry.npmmirror.com/comlink/4.3.1
-      vite: registry.npmmirror.com/vite/2.8.6
+      vite: registry.npmmirror.com/vite/2.9.0
     dev: true
 
   registry.npmmirror.com/vite-plugin-cross-origin-isolation/0.1.1:
@@ -3628,10 +3628,10 @@ packages:
     version: 0.1.1
     dev: true
 
-  registry.npmmirror.com/vite/2.8.6:
-    resolution: {integrity: sha512-e4H0QpludOVKkmOsRyqQ7LTcMUDF3mcgyNU4lmi0B5JUbe0ZxeBBl8VoZ8Y6Rfn9eFKYtdXNPcYK97ZwH+K2ug==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/vite/-/vite-2.8.6.tgz}
+  registry.npmmirror.com/vite/2.9.0:
+    resolution: {integrity: sha512-5NAnNqzPmZzJvrswZGeTS2JHrBGIzIWJA2hBTTMYuoBVEMh0xwE0b5yyIXFxf7F07hrK4ugX2LJ7q6t7iIbd4Q==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/vite/-/vite-2.9.0.tgz}
     name: vite
-    version: 2.8.6
+    version: 2.9.0
     engines: {node: '>=12.2.0'}
     hasBin: true
     peerDependencies:
@@ -3654,10 +3654,10 @@ packages:
       fsevents: registry.npmmirror.com/fsevents/2.3.2
     dev: true
 
-  registry.npmmirror.com/vitest/0.7.11:
-    resolution: {integrity: sha512-xCEUBCpqiIVhUFIMCKKXDZ/bcPLk2EhPmTFA9qw+Kf+B2d/gm3ZBdUAMa3jIZNZ/d3esji5H6XZPNAk//9K4Kw==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/vitest/-/vitest-0.7.11.tgz}
+  registry.npmmirror.com/vitest/0.8.1:
+    resolution: {integrity: sha512-8HUyc9io1UInZTUKJWTgPG5fMEqd86IlMCjn2CEjGjli55M7iUJiiMwns9W21wKs6DMrRs2lu89X6rbfVvF53A==, registry: https://registry.npm.taobao.org/, tarball: https://registry.npmmirror.com/vitest/-/vitest-0.8.1.tgz}
     name: vitest
-    version: 0.7.11
+    version: 0.8.1
     engines: {node: '>=v14.16.0'}
     hasBin: true
     peerDependencies:
@@ -3681,7 +3681,7 @@ packages:
       local-pkg: registry.npmmirror.com/local-pkg/0.4.1
       tinypool: registry.npmmirror.com/tinypool/0.1.2
       tinyspy: registry.npmmirror.com/tinyspy/0.3.0
-      vite: registry.npmmirror.com/vite/2.8.6
+      vite: registry.npmmirror.com/vite/2.9.0
     transitivePeerDependencies:
       - less
       - sass
