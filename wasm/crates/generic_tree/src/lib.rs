@@ -1,3 +1,4 @@
+#![feature(test)]
 mod generic_tree;
 
 #[cfg(test)]

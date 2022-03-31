@@ -1,7 +1,8 @@
 use core::panic;
 use rayon::prelude::*;
-use spmc;
 use std::fmt::Display;
+extern crate test;
+use test::{black_box, Bencher};
 
 use num::Float;
 
@@ -391,10 +392,13 @@ impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
 
         Ok(())
     }
-
-    pub fn find_closest(&mut self, point: &[F; N]) -> Option<&Node<F, N, D>> {
+    pub fn find_closest_with_max_dist(
+        &self,
+        point: &[F; N],
+        max_dist: F,
+    ) -> Option<&Node<F, N, D>> {
         let mut stack = vec![&self.root];
-        let mut min_dist = F::infinity();
+        let mut min_dist = max_dist;
         let mut min_ans = None;
         while let Some(node) = stack.pop() {
             match node {
@@ -422,6 +426,10 @@ impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
         }
 
         min_ans
+    }
+
+    pub fn find_closest(&self, point: &[F; N]) -> Option<&Node<F, N, D>> {
+        self.find_closest_with_max_dist(point, F::infinity())
     }
 
     pub fn visit<FF>(&self, func: FF) -> ()
@@ -675,51 +683,52 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_parallel_inserts() {
-        let mut nodes = vec![];
-        for i in 0..1000 {
-            for j in 0..1000 {
-                nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
-            }
-        }
+    extern crate test;
+    use test::{black_box, Bencher};
+    #[bench]
+    fn test_single_thread_inserts(bench: &mut Bencher) {
+        // 167ms in release build
 
-        let start = std::time::Instant::now();
-        let tree = GenericTree::<f64, 2, usize>::new_in_par(&nodes, 1.0, 10);
-        let duration = start.elapsed();
-        println!("parallel insertion time: {:?}", duration.as_micros());
+        bench.iter(black_box(|| {
+            let mut nodes = vec![];
+            for i in 0..1000 {
+                for j in 0..1000 {
+                    nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
+                }
+            }
+            let mut tree = GenericTree::<f64, 2, usize>::new(
+                [
+                    Bound {
+                        min: -1.0,
+                        max: 1001.0,
+                    },
+                    Bound {
+                        min: -1.0,
+                        max: 1001.0,
+                    },
+                ],
+                1.0,
+                10,
+            );
+
+            for node in nodes.into_iter() {
+                tree.add_node(node).unwrap();
+            }
+        }));
+    }
+}
+
+#[bench]
+fn test_parallel_inserts(bench: &mut Bencher) {
+    // 71ms in release build
+    let mut nodes = vec![];
+    for i in 0..1000 {
+        for j in 0..1000 {
+            nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
+        }
     }
 
-    #[test]
-    fn test_single_thread_inserts() {
-        let mut nodes = vec![];
-        for i in 0..1000 {
-            for j in 0..1000 {
-                nodes.push(Node::new_point([i as f64, j as f64], i * 1000 + j));
-            }
-        }
-
-        let mut tree = GenericTree::<f64, 2, usize>::new(
-            [
-                Bound {
-                    min: -1.0,
-                    max: 1001.0,
-                },
-                Bound {
-                    min: -1.0,
-                    max: 1001.0,
-                },
-            ],
-            1.0,
-            10,
-        );
-
-        let start = std::time::Instant::now();
-        for node in nodes.into_iter() {
-            tree.add_node(node).unwrap();
-        }
-
-        let duration = start.elapsed();
-        println!("parallel insertion time: {:?}", duration.as_micros());
-    }
+    bench.iter(black_box(|| {
+        GenericTree::<f64, 2, usize>::new_in_par(&nodes, 1.0, 10);
+    }));
 }
