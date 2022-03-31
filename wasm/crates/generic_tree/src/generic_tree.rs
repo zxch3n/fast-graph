@@ -203,24 +203,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
     }
 
     pub fn get_sub_region(&self, point: &[F; N]) -> usize {
-        match self {
-            Node::Region {
-                bounds,
-                children: _,
-            } => {
-                let mut index = 0;
-                for i in (0..N).rev() {
-                    let m = bounds[i].middle();
-                    if point[i] > m {
-                        index += 1;
-                    }
-                    index <<= 1;
-                }
-
-                index >> 1
-            }
-            _ => panic!(),
-        }
+        Self::get_child_region_index(point, self.bounds())
     }
 
     fn get_leaf_region(&mut self, point: &[F; N]) -> &mut Self {
@@ -587,12 +570,11 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
             .map(|node| Box::new(node.clone()))
             .collect::<Vec<_>>();
 
-        run(&mut nodes, &mut tree.root, leaf_max_children);
-        std::mem::forget(nodes);
+        run(nodes, &mut tree.root, leaf_max_children);
         return tree;
 
-        fn run<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
-            mut nodes: &mut [Box<Node<F, N, D>>],
+        fn run<F: Float + Send + Sync, const N: usize, D: Send + Sync + Clone>(
+            mut nodes: Vec<Box<Node<F, N, D>>>,
             leaf: &mut Node<F, N, D>,
             leaf_max_children: u32,
         ) {
@@ -600,63 +582,40 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
 
             if leaf.children().len() + nodes.len() <= leaf_max_children as usize {
                 for node in nodes {
-                    let node: *const Box<Node<F, N, D>> = &*node;
-                    unsafe {
-                        leaf.insert_point(std::ptr::read(node), leaf_max_children)
-                            .unwrap();
-                    }
+                    leaf.insert_point(node, leaf_max_children).unwrap();
+                    leaf.check().unwrap();
                 }
             } else {
-                let split_pos = divide(nodes, leaf.bounds(), N - 1);
-                let mut prev = 0;
-                let mut sub_nodes = vec![];
-                debug_assert!(split_pos.len() == (1 << N) - 1);
-                for i in 0..split_pos.len() {
-                    let cur = split_pos[i];
-                    let (left, right) = nodes.split_at_mut(cur - prev);
-                    nodes = right;
-                    sub_nodes.push(left);
-                    prev = cur;
-                }
+                let bounds = leaf.bounds();
+                let sub_nodes = nodes
+                    .into_par_iter()
+                    .with_min_len(2 << N)
+                    .fold(
+                        || vec![vec![]; 1 << N],
+                        |mut ans, node| {
+                            let index =
+                                Node::<F, N, D>::get_child_region_index(node.coord(), bounds);
+                            ans[index].push(node);
+                            ans
+                        },
+                    )
+                    .reduce(
+                        || vec![vec![]; 1 << N],
+                        |mut prev, this| {
+                            for (i, v) in this.into_iter().enumerate() {
+                                prev[i].extend(v);
+                            }
 
-                sub_nodes.push(nodes);
+                            prev
+                        },
+                    );
+                debug_assert!(sub_nodes.len() == (1 << N));
                 leaf.divide().unwrap_or(());
                 leaf.children()
                     .into_par_iter()
                     .zip(sub_nodes)
                     .for_each(|(child, nodes)| run(nodes, child, leaf_max_children));
             }
-        }
-
-        fn divide<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
-            nodes: &mut [Box<Node<F, N, D>>],
-            bounds: &[Bound<F>; N],
-            bound_index: usize,
-        ) -> Vec<usize> {
-            let mut ans = vec![];
-            let middle = bounds[bound_index].middle();
-            let mut lt_end_index = 0;
-            for i in 0..nodes.len() {
-                if nodes[i].coord()[bound_index] < middle {
-                    nodes.swap(i, lt_end_index);
-                    lt_end_index += 1;
-                }
-            }
-
-            if bound_index != 0 {
-                let (left, right) = nodes.split_at_mut(lt_end_index);
-                let (left, right) = join(
-                    || divide(left, bounds, bound_index - 1),
-                    || divide(right, bounds, bound_index - 1),
-                );
-                ans = left;
-                ans.push(lt_end_index);
-                ans.extend(right.into_iter().map(|x| x + lt_end_index));
-            } else {
-                ans.push(lt_end_index);
-            }
-
-            ans
         }
     }
 }
@@ -775,6 +734,10 @@ mod tests {
 
     #[test]
     fn test_parallel_inserts() {
+        ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build_global()
+            .unwrap();
         let mut nodes = vec![];
         for i in 0..100 {
             for j in 0..100 {
@@ -798,6 +761,7 @@ mod tests {
     }
 
     extern crate test;
+    use rayon::ThreadPoolBuilder;
     use test::{black_box, Bencher};
     #[bench]
     fn test_single_thread_inserts(bench: &mut Bencher) {
