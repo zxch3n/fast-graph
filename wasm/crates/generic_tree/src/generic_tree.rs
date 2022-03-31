@@ -950,8 +950,14 @@ fn test_parallel_inserts(bench: &mut Bencher) {
     // 8 threads 45.5ms
 
     // AMD Ryzen 9 3900X 12-Core Processor 3.80 GHz
+    // 1 threads 230.83333333333334ms
+    // 2 threads 129.22222222222223ms
+    // 4 threads 79.05555555555556ms
+    // 8 threads 55.94444444444444ms
+    // 16 threads 48.22222222222222ms
+    // 24 threads 51.94444444444444ms
 
-    for thread_num in [1, 2, 4, 8] {
+    for thread_num in [1, 2, 4, 8, 16, 24] {
         let pool = ThreadPoolBuilder::new()
             .num_threads(thread_num)
             .build()
