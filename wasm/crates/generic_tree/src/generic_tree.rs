@@ -592,7 +592,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
         return tree;
 
         fn run<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
-            mut nodes: &mut [Box<Node<F, N, D>>],
+            nodes: &mut [Box<Node<F, N, D>>],
             leaf: &mut Node<F, N, D>,
             leaf_max_children: u32,
         ) {
@@ -607,19 +607,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
                     }
                 }
             } else {
-                let split_pos = divide(nodes, leaf.bounds(), N - 1);
-                let mut prev = 0;
-                let mut sub_nodes = vec![];
-                debug_assert!(split_pos.len() == (1 << N) - 1);
-                for i in 0..split_pos.len() {
-                    let cur = split_pos[i];
-                    let (left, right) = nodes.split_at_mut(cur - prev);
-                    nodes = right;
-                    sub_nodes.push(left);
-                    prev = cur;
-                }
-
-                sub_nodes.push(nodes);
+                let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
                 leaf.divide().unwrap_or(());
                 leaf.children()
                     .into_par_iter()
@@ -628,11 +616,11 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
             }
         }
 
-        fn divide<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
-            nodes: &mut [Box<Node<F, N, D>>],
+        fn divide<'a, F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            nodes: &'a mut [Box<Node<F, N, D>>],
             bounds: &[Bound<F>; N],
             bound_index: usize,
-        ) -> Vec<usize> {
+        ) -> Vec<&'a mut [Box<Node<F, N, D>>]> {
             let mut ans = vec![];
             let middle = bounds[bound_index].middle();
             let mut lt_end_index = 0;
@@ -643,17 +631,17 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
                 }
             }
 
+            let (left, right) = nodes.split_at_mut(lt_end_index);
             if bound_index != 0 {
-                let (left, right) = nodes.split_at_mut(lt_end_index);
                 let (left, right) = join(
                     || divide(left, bounds, bound_index - 1),
                     || divide(right, bounds, bound_index - 1),
                 );
                 ans = left;
-                ans.push(lt_end_index);
-                ans.extend(right.into_iter().map(|x| x + lt_end_index));
+                ans.extend(right);
             } else {
-                ans.push(lt_end_index);
+                ans.push(left);
+                ans.push(right);
             }
 
             ans
