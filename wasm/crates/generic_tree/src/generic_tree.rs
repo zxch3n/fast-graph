@@ -92,6 +92,16 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
     }
 
+    pub fn try_get_children(&mut self) -> Option<&mut Vec<Box<Node<F, N, D>>>> {
+        match self {
+            Node::Point { coord: _, data: _ } => None,
+            Node::Region {
+                bounds: _,
+                children,
+            } => Some(children),
+        }
+    }
+
     pub fn new_point(coord: [F; N], data: D) -> Self {
         Node::Point { coord, data }
     }
@@ -112,8 +122,11 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
 
         match self {
-            Node::Point { coord, data } => coord.dist(point),
-            Node::Region { bounds, children } => {
+            Node::Point { coord, data: _ } => coord.dist(point),
+            Node::Region {
+                bounds,
+                children: _,
+            } => {
                 let mut dist = F::zero();
                 for i in 0..N {
                     if point[i] > bounds[i].max {
@@ -308,7 +321,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
                 match &*point {
                     Node::Point { coord, data: _ } => {
                         let node = Some(self.get_leaf_region(&coord));
-                        node.unwrap().insert_point(point, max_num);
+                        node.unwrap().insert_point(point, max_num)?;
                     }
                     Node::Region {
                         bounds: _,
@@ -323,8 +336,11 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
 
     pub fn bounds(&self) -> &[Bound<F>; N] {
         match self {
-            Node::Point { coord, data } => panic!(),
-            Node::Region { bounds, children } => bounds,
+            Node::Point { coord: _, data: _ } => panic!(),
+            Node::Region {
+                bounds,
+                children: _,
+            } => bounds,
         }
     }
 
@@ -400,7 +416,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
     }
 }
 
-pub struct GenericTree<F: Float, const N: usize, D> {
+pub struct GenericTree<F: Float + Send + Sync, const N: usize, D: Clone + Send + Sync> {
     root: Node<F, N, D>,
     bounds: [Bound<F>; N],
     num: u32,
@@ -411,7 +427,7 @@ pub struct GenericTree<F: Float, const N: usize, D> {
     leaf_max_children: u32,
 }
 
-impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
+impl<F: Float + Send + Sync, const N: usize, D: Clone + Send + Sync> GenericTree<F, N, D> {
     pub fn new(bounds: [Bound<F>; N], min_dist: F, leaf_max_children: u32) -> Self {
         if leaf_max_children == 0 {
             panic!("leaf_max_children must be greater than 0");
@@ -520,7 +536,9 @@ impl<F: Float, const N: usize, D> GenericTree<F, N, D> {
     }
 }
 
-impl<F: Float + Display, const N: usize, D: Display> GenericTree<F, N, D> {
+impl<F: Float + Display + Send + Sync, const N: usize, D: Display + Clone + Send + Sync>
+    GenericTree<F, N, D>
+{
     fn debug(&self) {
         let space = String::from(" ");
         self.visit(|node, depth| match node {
@@ -743,6 +761,18 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
             ans
         }
     }
+
+    fn clear(&mut self) {
+        if let Some(stack) = self.root.try_get_children() {
+            while let Some(node) = stack.pop() {
+                match *node {
+                    Node::Point { .. } => {}
+                    Node::Region { mut children, .. } => stack.append(&mut children),
+                }
+            }
+        }
+        self.num = 0;
+    }
 }
 
 impl<F: Float, const N: usize> Distance<F> for [F; N] {
@@ -755,6 +785,22 @@ impl<F: Float, const N: usize> Distance<F> for [F; N] {
         F::sqrt(square_sum)
     }
 }
+
+impl<F: Float + Send + Sync, const N: usize, D: Clone + Send + Sync> Drop for GenericTree<F, N, D> {
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+/* #region TEST */
+
+// ====================================================================
+//
+//
+//                              TEST
+//
+//
+// ====================================================================
 
 #[cfg(test)]
 mod tests {
@@ -957,7 +1003,7 @@ fn test_parallel_inserts(bench: &mut Bencher) {
     // 16 threads 48.22222222222222ms
     // 24 threads 51.94444444444444ms
 
-    for thread_num in [1, 2, 4, 8, 16, 24] {
+    for thread_num in [1, 2, 4, 8] {
         let pool = ThreadPoolBuilder::new()
             .num_threads(thread_num)
             .build()
@@ -984,7 +1030,11 @@ fn test_parallel_inserts(bench: &mut Bencher) {
                 let tree = GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
                 let duration = start.elapsed().as_millis();
                 durations.push(duration);
+                // let start = Instant::now();
                 temp.push(tree.num);
+                // DROP IN ANOTHER THREAD! IMPORTANT!
+                pool.spawn(move || drop(tree));
+                // println!("drop {}ms", start.elapsed().as_millis());
             }
 
             durations.sort();
@@ -994,3 +1044,5 @@ fn test_parallel_inserts(bench: &mut Bencher) {
         })
     }
 }
+
+/* #endregion */

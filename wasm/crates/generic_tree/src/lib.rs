@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 #![feature(test)]
 mod generic_tree;
 
