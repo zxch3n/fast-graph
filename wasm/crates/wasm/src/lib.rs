@@ -33,7 +33,8 @@ pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
     }
 
     let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
-    *tree.find_closest(&[target[0], target[1]]).unwrap().data()
+    let data = *tree.find_closest(&[target[0], target[1]]).unwrap().data();
+    data
 }
 
 #[cfg(test)]

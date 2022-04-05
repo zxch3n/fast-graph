@@ -15,7 +15,8 @@
     "doc": "typedoc src/index.ts",
     "release": "yarn build && standard-version",
     "typecheck": "tsc --noEmit",
-    "test:deno": "deno run -A ./deno/run.ts"
+    "test:deno": "deno run -A ./deno/run.ts test",
+    "bench:deno": "deno run -A ./deno/run.ts bench"
   },
   "keywords": [
     "js",

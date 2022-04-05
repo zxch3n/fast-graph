@@ -68,7 +68,7 @@ fn test_parallel_inserts(bench: &mut Bencher) {
 }
 
 #[bench]
-fn test_single_thread_inserts(bench: &mut Bencher) {
+fn bench_single_thread_inserts(bench: &mut Bencher) {
     // 579ms on random data / 167ms if data is evenly distributed
 
     bench.iter(black_box(|| {
@@ -104,7 +104,7 @@ fn test_single_thread_inserts(bench: &mut Bencher) {
 }
 
 #[bench]
-fn test_single_thread(bench: &mut Bencher) {
+fn bench_single_thread(bench: &mut Bencher) {
     // 266ms, rayon is almost no overhead! damn!
     // 464ms on Ryzen
     let mut rng = rand::thread_rng();
