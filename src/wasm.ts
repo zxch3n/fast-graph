@@ -1,2 +1,2 @@
-import instance from 'comlink:./wasmEntry';
-export const { calcSumOfSquares, init } = instance();
+import instance from "comlink:./wasmEntry";
+export const { calcSumOfSquares, init, findInside } = instance();

@@ -1,10 +1,6 @@
 use core::panic;
-use rand::Rng;
 use rayon::{join, prelude::*, ThreadPoolBuilder};
 use std::{fmt::Display, time::Instant};
-extern crate rand;
-extern crate test;
-use test::{black_box, Bencher};
 
 use num::Float;
 
@@ -14,8 +10,8 @@ use num::Float;
 ///
 #[derive(Clone, Copy, Debug)]
 pub struct Bound<F: Float> {
-    min: F,
-    max: F,
+    pub min: F,
+    pub max: F,
 }
 
 impl<F: Float + Display> Display for Bound<F> {
@@ -351,7 +347,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
         }
     }
 
-    fn data(&self) -> &D {
+    pub fn data(&self) -> &D {
         match self {
             Node::Point { coord: _, data } => data,
             _ => panic!(),
@@ -419,7 +415,7 @@ impl<F: Float, const N: usize, D> Node<F, N, D> {
 pub struct GenericTree<F: Float + Send + Sync, const N: usize, D: Clone + Send + Sync> {
     root: Node<F, N, D>,
     bounds: [Bound<F>; N],
-    num: u32,
+    pub num: u32,
     min_dist: F,
     /**
      * leaf region max children
@@ -792,17 +788,6 @@ impl<F: Float + Send + Sync, const N: usize, D: Clone + Send + Sync> Drop for Ge
     }
 }
 
-/* #region TEST */
-
-// ====================================================================
-//
-//
-//                              TEST
-//
-//
-// ====================================================================
-
-#[cfg(test)]
 mod tests {
     use std::thread;
 
@@ -868,42 +853,6 @@ mod tests {
     }
 
     #[test]
-    fn test_spmc() {
-        let (mut tx, rx) = spmc::channel::<&mut Node<f64, 2, usize>>();
-        let mut handles = Vec::new();
-        for n in 0..5 {
-            let rx = rx.clone();
-            handles.push(thread::spawn(move || {
-                let msg = rx.recv().unwrap();
-                println!("worker {} recvd: {}", n, msg.data());
-                msg.set_data(100);
-            }));
-        }
-
-        let mut nodes = vec![
-            Node::<f64, 2, usize>::new_point([4.0, 5.0], 0),
-            Node::<f64, 2, usize>::new_point([4.0, 5.0], 1),
-            Node::<f64, 2, usize>::new_point([4.0, 5.0], 2),
-            Node::<f64, 2, usize>::new_point([4.0, 5.0], 3),
-            Node::<f64, 2, usize>::new_point([4.0, 5.0], 4),
-        ];
-        for i in 0..5 {
-            let node: *mut _ = &mut nodes[i];
-            unsafe {
-                tx.send(&mut *node).unwrap();
-            }
-        }
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        for node in nodes {
-            println!("{}", node.data());
-        }
-    }
-
-    #[test]
     fn test_parallel_inserts() {
         let mut nodes = vec![];
         for i in 0..100 {
@@ -926,123 +875,4 @@ mod tests {
             }
         }
     }
-
-    extern crate test;
-    use rand::Rng;
-    use test::{black_box, Bencher};
-    #[bench]
-    fn test_single_thread_inserts(bench: &mut Bencher) {
-        // 579ms on random data / 167ms if data is evenly distributed
-
-        bench.iter(black_box(|| {
-            let mut nodes = vec![];
-            let mut rng = rand::thread_rng();
-            for i in 0..1000 {
-                for j in 0..1000 {
-                    nodes.push(Node::new_point(
-                        [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
-                        i * 1000 + j,
-                    ));
-                }
-            }
-            let mut tree = GenericTree::<f64, 2, usize>::new(
-                [
-                    Bound {
-                        min: -1.0,
-                        max: 1001.0,
-                    },
-                    Bound {
-                        min: -1.0,
-                        max: 1001.0,
-                    },
-                ],
-                1.0,
-                10,
-            );
-
-            for node in nodes.into_iter() {
-                tree.add_node(node).unwrap();
-            }
-        }));
-    }
 }
-
-#[bench]
-fn test_single_thread(bench: &mut Bencher) {
-    // 266ms, rayon is almost no overhead! damn!
-    // 464ms on Ryzen
-    let mut rng = rand::thread_rng();
-    bench.iter(black_box(|| {
-        let mut nodes = vec![];
-        for i in 0..1000 {
-            for j in 0..1000 {
-                nodes.push(Node::new_point(
-                    [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
-                    i * 1000 + j,
-                ));
-            }
-        }
-
-        GenericTree::<f64, 2, usize>::from_nodes(nodes, 1.0, 10);
-    }));
-}
-
-#[bench]
-fn test_parallel_inserts(bench: &mut Bencher) {
-    // M1
-    // 1 threads 151.22222222222223ms
-    // 2 threads 87.72222222222223ms
-    // 4 threads 54.333333333333336ms
-    // 8 threads 45.5ms
-
-    // AMD Ryzen 9 3900X 12-Core Processor 3.80 GHz
-    // 1 threads 230.83333333333334ms
-    // 2 threads 129.22222222222223ms
-    // 4 threads 79.05555555555556ms
-    // 8 threads 55.94444444444444ms
-    // 16 threads 48.22222222222222ms
-    // 24 threads 51.94444444444444ms
-
-    for thread_num in [1, 2, 4, 8] {
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(thread_num)
-            .build()
-            .unwrap();
-        pool.install(|| {
-            let mut rng = rand::thread_rng();
-
-            // let start = Instant::now();
-            let mut nodes = vec![];
-            for i in 0..1000 {
-                for j in 0..1000 {
-                    nodes.push(Box::new(Node::new_point(
-                        [(rng.gen::<f64>()) * 1000., rng.gen::<f64>() * 1000.],
-                        i * 1000 + j,
-                    )));
-                }
-            }
-
-            let mut durations = vec![];
-            let mut temp = vec![];
-            for _ in 0..20 {
-                let nodes = nodes.clone();
-                let start = Instant::now();
-                let tree = GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
-                let duration = start.elapsed().as_millis();
-                durations.push(duration);
-                // let start = Instant::now();
-                temp.push(tree.num);
-                // DROP IN ANOTHER THREAD! IMPORTANT!
-                pool.spawn(move || drop(tree));
-                // println!("drop {}ms", start.elapsed().as_millis());
-            }
-
-            durations.sort();
-            let slice = &durations[1..durations.len() - 1];
-            let avg = (slice.iter().sum::<u128>() as f64) / (slice.len() as f64);
-            println!("{} threads {}ms", thread_num, avg);
-        })
-    }
-}
-
-/* #endregion */

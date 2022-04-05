@@ -19,5 +19,6 @@
     "preserveSymlinks": true,
     "outDir": "lib/"
   },
-  "include": ["src", "./comlink.d.ts", "deno/run.deno.ts"]
+  "include": ["src", "./comlink.d.ts"],
+  "exclude": ["deno"]
 }

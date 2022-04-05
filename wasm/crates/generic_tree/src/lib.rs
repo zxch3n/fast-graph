@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports)]
-#![feature(test)]
 mod generic_tree;
+pub use generic_tree::{Bound, GenericTree, Node};
 
 #[cfg(test)]
 mod tests {

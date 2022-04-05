@@ -1,13 +1,16 @@
 {
-	"folders": [
-		{
-			"path": ".."
-		},
-		{
-			"path": "../deno"
-		}
-	],
-	"settings": {
-		"importSorter.importStringConfiguration.tabSize": 2
-	}
+  "folders": [
+    {
+      "path": ".."
+    },
+    {
+      "path": "../wasm"
+    },
+    {
+      "path": "../deno"
+    }
+  ],
+  "settings": {
+    "importSorter.importStringConfiguration.tabSize": 2
+  }
 }
