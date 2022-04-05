@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
-import { calcSumOfSquares, init } from './wasm';
+import { useCallback, useState } from 'react';
 
+import { findInside, init } from './wasm';
+
+const promise = init(1);
+const input = new Float64Array(new Array(1e4).fill(0).map(() => Math.random()));
 function App() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    (async () => {
-      await init();
-      console.log(await calcSumOfSquares([1, 2]));
-    })();
+  const [running, setRunning] = useState(false);
+  const callback = useCallback(async () => {
+    setRunning(true);
+    await promise;
+    await target();
+    setRunning(false);
   }, []);
 
   return (
@@ -15,8 +18,8 @@ function App() {
       <header className="App-header">
         <p>Hello Vite + React!</p>
         <p>
-          <button type="button" onClick={() => setCount((count) => count + 1)}>
-            count is: {count}
+          <button type="button" onClick={callback}>
+            {running ? '...' : 'RUN'}
           </button>
         </p>
         <p>
@@ -47,3 +50,32 @@ function App() {
 }
 
 export default App;
+
+async function run() {
+  const testStart = performance.now();
+  const durations = [] as number[];
+  for (let i = 0; i < 20; i++) {
+    const start = performance.now();
+    await target();
+    const duration = performance.now() - start;
+    // console.log(duration);
+    if (i > 3) {
+      durations.push(duration);
+    }
+
+    await new Promise((r) => setTimeout(r, 100));
+    if (performance.now() - testStart > 5_000) {
+      break;
+    }
+  }
+
+  const mean = durations.reduce((a, b) => a + b) / durations.length;
+  const std = Math.sqrt(
+    durations.reduce((a, b) => a + b * b, 0) / durations.length - mean * mean,
+  );
+  console.log('4 threads tree insert 1k >> ', mean, 'ms +-', std);
+}
+
+async function target() {
+  await findInside(input, [1, 1]);
+}

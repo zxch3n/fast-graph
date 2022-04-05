@@ -654,6 +654,96 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
         }
     }
 
+    pub fn new_single_thread(
+        mut nodes: Vec<Box<Node<F, N, D>>>,
+        min_dist: F,
+        leaf_max_children: u32,
+    ) -> GenericTree<F, N, D> {
+        let (max, min) = nodes.iter().fold(
+            ([F::neg_infinity(); N], [F::infinity(); N]),
+            |(mut max_coord, mut min_coord), node| {
+                let coord = node.coord();
+                for i in 0..N {
+                    max_coord[i] = max_coord[i].max(coord[i]);
+                    min_coord[i] = min_coord[i].min(coord[i]);
+                }
+
+                (max_coord, min_coord)
+            },
+        );
+
+        let bounds: [Bound<F>; N] = min
+            .into_iter()
+            .zip(max)
+            .map(|(min, max)| Bound { min, max })
+            .collect::<Vec<Bound<F>>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!());
+
+        let mut tree: GenericTree<F, N, D> = GenericTree::new(bounds, min_dist, leaf_max_children);
+        tree.num = nodes.len() as u32;
+
+        run(&mut nodes, &mut tree.root, leaf_max_children, 0);
+        std::mem::forget(nodes);
+        return tree;
+
+        fn run<F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            nodes: &mut [Box<Node<F, N, D>>],
+            leaf: &mut Node<F, N, D>,
+            leaf_max_children: u32,
+            depth: usize,
+        ) {
+            debug_assert!(leaf.is_leaf_region());
+
+            if leaf.children().len() + nodes.len() <= leaf_max_children as usize {
+                for node in nodes {
+                    let node: *const Box<Node<F, N, D>> = &*node;
+                    unsafe {
+                        leaf.insert_point_directly(std::ptr::read(node));
+                    }
+                }
+            } else {
+                let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
+                leaf.divide().unwrap_or(());
+                leaf.children()
+                    .into_iter()
+                    .zip(sub_nodes)
+                    .for_each(|(child, nodes)| run(nodes, child, leaf_max_children, depth + 1));
+            }
+        }
+
+        fn divide<'a, F: Float + Send + Sync, const N: usize, D: Send + Sync>(
+            nodes: &'a mut [Box<Node<F, N, D>>],
+            bounds: &[Bound<F>; N],
+            bound_index: usize,
+        ) -> Vec<&'a mut [Box<Node<F, N, D>>]> {
+            let mut ans = vec![];
+            let middle = bounds[bound_index].middle();
+            let mut lt_end_index = 0;
+            for i in 0..nodes.len() {
+                if nodes[i].coord()[bound_index] < middle {
+                    nodes.swap(i, lt_end_index);
+                    lt_end_index += 1;
+                }
+            }
+
+            let (left, right) = nodes.split_at_mut(lt_end_index);
+            if bound_index != 0 {
+                let (left, right) = (
+                    divide(left, bounds, bound_index - 1),
+                    divide(right, bounds, bound_index - 1),
+                );
+                ans = left;
+                ans.extend(right);
+            } else {
+                ans.push(left);
+                ans.push(right);
+            }
+
+            ans
+        }
+    }
+
     pub fn new_in_par(
         mut nodes: Vec<Box<Node<F, N, D>>>,
         min_dist: F,
@@ -661,6 +751,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
     ) -> GenericTree<F, N, D> {
         let (max, min) = nodes
             .par_iter()
+            .with_min_len(1000)
             .fold(
                 || ([F::neg_infinity(); N], [F::infinity(); N]),
                 |(mut max_coord, mut min_coord), node| {
@@ -698,7 +789,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
         let mut tree: GenericTree<F, N, D> = GenericTree::new(bounds, min_dist, leaf_max_children);
         tree.num = nodes.len() as u32;
 
-        run(&mut nodes, &mut tree.root, leaf_max_children);
+        run(&mut nodes, &mut tree.root, leaf_max_children, 0);
         std::mem::forget(nodes);
         return tree;
 
@@ -706,6 +797,7 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
             nodes: &mut [Box<Node<F, N, D>>],
             leaf: &mut Node<F, N, D>,
             leaf_max_children: u32,
+            depth: usize,
         ) {
             debug_assert!(leaf.is_leaf_region());
 
@@ -719,10 +811,17 @@ impl<F: Float + Sync + Send, const N: usize, D: Sync + Send + Clone> GenericTree
             } else {
                 let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
                 leaf.divide().unwrap_or(());
-                leaf.children()
-                    .into_par_iter()
-                    .zip(sub_nodes)
-                    .for_each(|(child, nodes)| run(nodes, child, leaf_max_children));
+                if depth % 3 == 0 {
+                    leaf.children()
+                        .into_par_iter()
+                        .zip(sub_nodes)
+                        .for_each(|(child, nodes)| run(nodes, child, leaf_max_children, depth + 1));
+                } else {
+                    leaf.children()
+                        .into_iter()
+                        .zip(sub_nodes)
+                        .for_each(|(child, nodes)| run(nodes, child, leaf_max_children, depth + 1));
+                }
             }
         }
 
@@ -779,12 +878,6 @@ impl<F: Float, const N: usize> Distance<F> for [F; N] {
         }
 
         F::sqrt(square_sum)
-    }
-}
-
-impl<F: Float + Send + Sync, const N: usize, D: Clone + Send + Sync> Drop for GenericTree<F, N, D> {
-    fn drop(&mut self) {
-        self.clear();
     }
 }
 

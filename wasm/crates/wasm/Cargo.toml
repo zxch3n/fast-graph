@@ -15,3 +15,6 @@ generic_tree = {path = "../generic_tree"}
 
 [profile.release.package.wasm]
 opt-level = 3
+
+[profile.release]
+debug = true

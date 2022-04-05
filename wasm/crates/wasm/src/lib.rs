@@ -32,8 +32,10 @@ pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
         )));
     }
 
-    let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
+    let tree = generic_tree::GenericTree::<f64, 2, usize>::new_single_thread(nodes, 0.1, 10);
+    // let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
     let data = *tree.find_closest(&[target[0], target[1]]).unwrap().data();
+    rayon::spawn(move || drop(tree));
     data
 }
 
