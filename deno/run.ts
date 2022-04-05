@@ -29,10 +29,10 @@ async function runBenches() {
     console.log();
 
     console.log("Start benching...");
-    const paths = testFiles.map((file) => viteServer + "/deno/" + file);
     console.log("-----------------------------\n");
-    console.log(">> " + testFiles.join(", ") + ":\n\n");
-    for (const path of paths) {
+    for (const file of testFiles) {
+      const path = viteServer + "/deno/" + file;
+      console.log(">> " + file + ":\n");
       await Deno.run({
         cmd: [
           "deno",
@@ -45,6 +45,7 @@ async function runBenches() {
         ],
         stdout: "inherit",
       }).status();
+      console.log("\n");
     }
 
     console.log();

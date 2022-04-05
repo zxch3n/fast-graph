@@ -39,6 +39,38 @@ pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
     data
 }
 
+/// 这种类型的并行在 WASM 上优化效果很好
+#[wasm_bindgen]
+pub fn heavy_calc(parallel: bool) -> usize {
+    if parallel {
+        (0..1_000_000)
+            .collect::<Vec<usize>>()
+            .par_iter()
+            .map(|&i| {
+                let mut sum = 0;
+                for m in (i..i + 100) {
+                    sum += sum - i * i;
+                }
+                sum
+            })
+            .max()
+            .unwrap()
+    } else {
+        (0..1_000_000)
+            .collect::<Vec<usize>>()
+            .iter()
+            .map(|&i| {
+                let mut sum = 0;
+                for m in (i..i + 100) {
+                    sum += sum - i * i;
+                }
+                sum
+            })
+            .max()
+            .unwrap()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

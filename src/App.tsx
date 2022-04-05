@@ -1,15 +1,20 @@
 import { useCallback, useState } from 'react';
 
-import { findInside, init } from './wasm';
+import { init, heavy_calc } from './wasm';
 
-const promise = init(1);
-const input = new Float64Array(new Array(1e4).fill(0).map(() => Math.random()));
+const promise = init();
 function App() {
   const [running, setRunning] = useState(false);
   const callback = useCallback(async () => {
-    setRunning(true);
     await promise;
-    await target();
+    setRunning(true);
+    await bench('single thread calc', async () => {
+      await heavy_calc(false);
+    });
+
+    await bench('multi-thread calc', async () => {
+      await heavy_calc(true);
+    });
     setRunning(false);
   }, []);
 
@@ -51,31 +56,9 @@ function App() {
 
 export default App;
 
-async function run() {
-  const testStart = performance.now();
-  const durations = [] as number[];
-  for (let i = 0; i < 20; i++) {
-    const start = performance.now();
-    await target();
-    const duration = performance.now() - start;
-    // console.log(duration);
-    if (i > 3) {
-      durations.push(duration);
-    }
-
-    await new Promise((r) => setTimeout(r, 100));
-    if (performance.now() - testStart > 5_000) {
-      break;
-    }
-  }
-
-  const mean = durations.reduce((a, b) => a + b) / durations.length;
-  const std = Math.sqrt(
-    durations.reduce((a, b) => a + b * b, 0) / durations.length - mean * mean,
-  );
-  console.log('4 threads tree insert 1k >> ', mean, 'ms +-', std);
-}
-
-async function target() {
-  await findInside(input, [1, 1]);
+export async function bench(name: string, fn: () => void | Promise<void>) {
+  const start = performance.now();
+  await fn();
+  const end = performance.now();
+  console.log(`${name}: ${end - start}ms`);
 }
