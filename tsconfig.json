@@ -20,5 +20,5 @@
     "outDir": "lib/"
   },
   "include": ["src", "./comlink.d.ts"],
-  "exclude": ["deno"]
+  "exclude": ["./deno/*"]
 }

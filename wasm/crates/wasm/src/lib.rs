@@ -1,6 +1,6 @@
 extern crate generic_tree;
 extern crate wasm_bindgen;
-use generic_tree::Node;
+use generic_tree::{parallel, Node};
 use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -20,6 +20,11 @@ pub fn greet(name: &str) {
 #[wasm_bindgen]
 pub fn sum_of_squares(input: &[i32]) -> i32 {
     input.par_iter().map(|i| i * i).sum()
+}
+
+#[wasm_bindgen]
+pub fn js_parallel() {
+    parallel();
 }
 
 #[wasm_bindgen]

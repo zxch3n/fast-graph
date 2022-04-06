@@ -4,7 +4,7 @@ import initWasm, {
   sum_of_squares,
 } from "../wasm_dist/wasm";
 
-export { heavy_calc } from "../wasm_dist/wasm";
+export { heavy_calc, js_parallel } from "../wasm_dist/wasm";
 
 export async function init(threadNum = navigator.hardwareConcurrency) {
   await initWasm();
