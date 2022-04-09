@@ -10,9 +10,6 @@ use num::Float;
 use crate::{tree_data::TreeData, Node};
 
 /// Bounds
-///
-///
-///
 #[derive(Clone, Copy, Debug)]
 pub struct Bound<F: Float> {
     pub min: F,
@@ -43,12 +40,13 @@ pub struct GenericTree<'bump, F: Float + Send + Sync, const N: usize, const N2: 
 {
     herd: &'bump Herd,
     root: &'bump mut Node<'bump, F, N, N2, D>,
+    /// 此树bounds
     bounds: [Bound<F>; N],
+    /// 当前节点数量
     pub num: u32,
+    /// 子节点间最小的距离
     min_dist: F,
-    /**
-     * leaf region max children
-     */
+    /// 叶子区域最大的子节点数量 leaf region max children
     leaf_max_children: u32,
 }
 
@@ -117,6 +115,8 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
 
         Ok(())
     }
+
+    /// 查询在`max_dist`范围内离point的最近节点
     pub fn find_closest_with_max_dist(
         &self,
         point: &[F; N],
@@ -141,7 +141,6 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
                             stack.push(&**child.as_ref().unwrap());
                         }
                     }
-
                     ()
                 }
             }
@@ -154,6 +153,9 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         self.find_closest_with_max_dist(point, F::infinity())
     }
 
+    /// 使用func: Fn(&Node<F, N, D>, usize) -> bool去后序遍历每一个节点
+    ///
+    /// 如果func返回true，那么该节点的子节点不会被访问
     pub fn visit_post_order<FF>(&mut self, mut func: FF)
     where
         FF: FnMut(&mut Node<'bump, F, N, N2, D>, usize) -> (),
@@ -178,6 +180,9 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         }
     }
 
+    /// 使用func: Fn(&Node<F, N, D>, usize) -> bool去先序遍历每一个节点
+    ///
+    /// 如果func返回true，那么该节点的子节点不会被访问
     pub fn visit_pre_order<FF>(&self, func: FF) -> ()
     where
         FF: Fn(&Node<'bump, F, N, N2, D>, usize) -> bool,
@@ -500,6 +505,7 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: TreeData
 }
 
 impl<F: Float, const N: usize> Distance<F> for [F; N] {
+    //! 计算N维坐标间的距离
     fn dist(&self, another: &Self) -> F {
         let mut square_sum = F::zero();
         for i in 0..N {
