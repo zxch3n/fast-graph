@@ -830,7 +830,7 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
         ) {
             debug_assert!(leaf.is_leaf_region());
 
-            if leaf.children().len() + nodes.len() <= leaf_max_children as usize {
+            if leaf.child_len() + nodes.len() <= leaf_max_children as usize {
                 for node in nodes {
                     let node: *const _ = &*node;
                     unsafe {
@@ -841,10 +841,10 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
                 let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
                 leaf.divide(herd).unwrap_or(());
                 leaf.children()
-                    .into_iter()
-                    .filter(|x| x.is_some())
-                    .map(|x| &mut **x.as_mut().unwrap())
+                    .into_par_iter()
                     .zip(sub_nodes)
+                    .filter(|(x, _)| x.is_some())
+                    .map(|(x, node)| (&mut **x.as_mut().unwrap(), node))
                     .for_each(|(child, nodes)| {
                         run(herd, nodes, &mut *child, leaf_max_children, depth + 1)
                     });
@@ -969,6 +969,31 @@ mod tests {
             for j in 0..100 {
                 let temp = tree.find_closest(&[i as f64, j as f64]).unwrap();
                 assert_eq!(temp.data(), &(i * 100 + j));
+            }
+        }
+    }
+
+    #[test]
+    fn test_from_nodes() {
+        let mut nodes = vec![];
+        let herd = Herd::new();
+        for i in 0..100 {
+            for j in 0..100 {
+                nodes.push(Node::new_point([i as f64, j as f64], i * 100 + j));
+            }
+        }
+
+        let tree = GenericTree::<'_, f64, 2, 4, usize>::from_nodes(&herd, nodes, 1.0, 3);
+        tree.root.check().unwrap();
+        for i in 0..100 {
+            for j in 0..100 {
+                assert_eq!(
+                    *tree
+                        .find_closest_with_max_dist(&[i as f64, j as f64], 2.0)
+                        .unwrap()
+                        .data(),
+                    i * 100 + j
+                );
             }
         }
     }
