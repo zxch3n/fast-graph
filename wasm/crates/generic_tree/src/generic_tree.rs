@@ -164,7 +164,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
     pub fn divide(&mut self, herd: &'bump Herd) -> Result<(), ()> {
         match self {
             Node::Region { bounds, children } => {
-                if children.len() == 0 {
+                if children.iter().filter(|x| x.is_some()).count() == 0 {
                     let mut children_bounds = vec![];
                     for _ in 0..two_power(N) {
                         children_bounds.push(bounds.clone());
@@ -297,6 +297,16 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
         }
     }
 
+    fn child_len(&self) -> usize {
+        match self {
+            Node::Point { coord: _, data: _ } => 0,
+            Node::Region {
+                bounds: _,
+                children,
+            } => children.iter().filter(|x| x.is_some()).count(),
+        }
+    }
+
     fn insert_point(
         &mut self,
         herd: &'bump Herd,
@@ -307,7 +317,6 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
             return Err(());
         }
 
-        let mut should_divide = false;
         if !self.contains(point.coord()) {
             panic!();
         }
@@ -318,17 +327,17 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
                 bounds: _,
                 children,
             } => {
-                should_divide = true;
                 for i in 0..children.len() {
                     if children[i].is_none() {
                         children[i] = Some(point);
-                        should_divide = false;
                         break;
                     }
                 }
             }
         }
 
+        let child_len = self.child_len();
+        let should_divide = child_len as u32 > max_num || child_len >= N2;
         if should_divide {
             let mut points = vec![];
             if let Node::Region {
@@ -472,6 +481,14 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
     ) -> Self {
         if leaf_max_children == 0 {
             panic!("leaf_max_children must be greater than 0");
+        }
+
+        if (1 << N) != N2 {
+            panic!("N2 must be 2^N");
+        }
+
+        if leaf_max_children >= N2 as u32 {
+            panic!("leaf_max_children cannot >= 2^N")
         }
 
         GenericTree {
@@ -938,7 +955,7 @@ mod tests {
                 },
             ],
             0.1,
-            10,
+            3,
         );
 
         for i in 0..100 {
@@ -969,7 +986,7 @@ mod tests {
             }
         }
 
-        let tree = GenericTree::<'_, f64, 2, 4, usize>::new_in_par(&herd, nodes, 1.0, 10);
+        let tree = GenericTree::<'_, f64, 2, 4, usize>::new_in_par(&herd, nodes, 1.0, 3);
         tree.root.check().unwrap();
         for i in 0..100 {
             for j in 0..100 {
