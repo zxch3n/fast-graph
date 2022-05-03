@@ -1,6 +1,6 @@
 use bumpalo::collections::Vec as BumpVec;
 use bumpalo::Bump;
-use bumpalo_herd::Herd;
+use bumpalo_herd::{Herd, Member};
 use core::panic;
 use rayon::{join, prelude::*, ThreadPoolBuilder};
 use std::{
@@ -161,7 +161,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
         }
     }
 
-    pub fn divide(&mut self, herd: &'bump Herd) -> Result<(), ()> {
+    pub fn divide(&mut self, member: &Member<'bump>) -> Result<(), ()> {
         match self {
             Node::Region { bounds, children } => {
                 if children.iter().filter(|x| x.is_some()).count() == 0 {
@@ -181,7 +181,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
                     }
 
                     for (i, child) in children_bounds.iter().enumerate() {
-                        children[i] = Some(herd.get().alloc(Node::new_region(child.clone())));
+                        children[i] = Some(member.alloc(Node::new_region(child.clone())));
                     }
                     Ok(())
                 } else {
@@ -260,26 +260,6 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
         node
     }
 
-    fn insert_points(
-        &mut self,
-        herd: &'bump Herd,
-        points: Vec<Self>,
-        max_num: u32,
-    ) -> Result<(), ()> {
-        for point in points.into_iter() {
-            if !self.contains(point.coord()) {
-                return Err(());
-            }
-
-            let region = self.get_leaf_region(point.coord());
-            region
-                .insert_point(herd, herd.get().alloc(point), max_num)
-                .unwrap();
-        }
-
-        Ok(())
-    }
-
     fn insert_point_directly(&mut self, point: &'bump mut Self) {
         match self {
             Node::Point { coord: _, data: _ } => {}
@@ -352,7 +332,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: Clone + 
                 }
             }
 
-            self.divide(herd).unwrap_or(());
+            self.divide(&herd.get()).unwrap_or(());
             for point in points {
                 match *point {
                     Node::Point { coord, data: _ } => {
@@ -673,12 +653,16 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
             GenericTree::new(&herd, bounds, min_dist, leaf_max_children);
         tree.num = nodes.len() as u32;
 
-        let mut nodes = nodes
-            .into_iter()
-            .map(|x| tree.herd.get().alloc(x))
-            .collect::<Vec<_>>();
+        let mem = tree.herd.get();
+        let mut nodes = nodes.into_iter().map(|x| mem.alloc(x)).collect::<Vec<_>>();
 
-        run(tree.herd, &mut nodes, &mut tree.root, leaf_max_children);
+        run(
+            tree.herd,
+            &mut nodes,
+            &mut tree.root,
+            leaf_max_children,
+            &herd.get(),
+        );
         std::mem::forget(nodes);
         return tree;
 
@@ -694,6 +678,7 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
             nodes: &'a mut [&'bump mut Node<'bump, F, N, N2, D>],
             leaf: &'a mut Node<'bump, F, N, N2, D>,
             leaf_max_children: u32,
+            member: &Member<'bump>,
         ) {
             let children_len = {
                 match leaf {
@@ -713,13 +698,15 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
                 }
             } else {
                 let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
-                leaf.divide(herd).unwrap_or(());
+                leaf.divide(member).unwrap_or(());
                 leaf.children()
                     .into_iter()
                     .filter(|x| x.is_some())
                     .map(|x| &mut **x.as_mut().unwrap())
                     .zip(sub_nodes)
-                    .for_each(|(child, nodes)| run(herd, nodes, &mut *child, leaf_max_children));
+                    .for_each(|(child, nodes)| {
+                        run(herd, nodes, &mut *child, leaf_max_children, member)
+                    });
             }
         }
 
@@ -811,7 +798,14 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
             .alloc(GenericTree::new(herd, bounds, min_dist, leaf_max_children));
         tree.num = nodes.len() as u32;
 
-        run(tree.herd, &mut nodes, &mut tree.root, leaf_max_children, 0);
+        run(
+            tree.herd,
+            &mut nodes,
+            &mut tree.root,
+            leaf_max_children,
+            0,
+            &herd.get(),
+        );
         std::mem::forget(nodes);
         return tree;
 
@@ -828,6 +822,7 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
             leaf: &'a mut Node<'bump, F, N, N2, D>,
             leaf_max_children: u32,
             depth: usize,
+            member: &Member<'bump>,
         ) {
             debug_assert!(leaf.is_leaf_region());
 
@@ -839,20 +834,40 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
                     }
                 }
             } else {
-                let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
-                leaf.divide(herd).unwrap_or(());
-                leaf.children()
-                    .into_par_iter()
-                    .zip(sub_nodes)
-                    .for_each(|(child, nodes)| {
-                        run(
-                            herd,
-                            nodes,
-                            &mut *child.as_mut().unwrap(),
-                            leaf_max_children,
-                            depth + 1,
-                        )
-                    });
+                // this is crucial for performance
+                if depth <= 2 {
+                    let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
+                    leaf.divide(member).unwrap_or(());
+                    leaf.children()
+                        .into_par_iter()
+                        .zip(sub_nodes)
+                        .for_each(|(child, nodes)| {
+                            run(
+                                herd,
+                                nodes,
+                                &mut *child.as_mut().unwrap(),
+                                leaf_max_children,
+                                depth + 1,
+                                &herd.get(),
+                            )
+                        });
+                } else {
+                    let sub_nodes = divide(nodes, leaf.bounds(), N - 1);
+                    leaf.divide(member).unwrap_or(());
+                    leaf.children()
+                        .into_iter()
+                        .zip(sub_nodes)
+                        .for_each(|(child, nodes)| {
+                            run(
+                                herd,
+                                nodes,
+                                &mut *child.as_mut().unwrap(),
+                                leaf_max_children,
+                                depth + 1,
+                                member,
+                            )
+                        });
+                }
             }
         }
 
@@ -881,9 +896,9 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
 
             let (left, right) = nodes.split_at_mut(lt_end_index);
             if bound_index != 0 {
-                let (left, right) = join(
-                    || divide(left, bounds, bound_index - 1),
-                    || divide(right, bounds, bound_index - 1),
+                let (left, right) = (
+                    divide(left, bounds, bound_index - 1),
+                    divide(right, bounds, bound_index - 1),
                 );
                 ans = left;
                 ans.extend(right);
