@@ -844,10 +844,14 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
                 leaf.children()
                     .into_par_iter()
                     .zip(sub_nodes)
-                    .filter(|(x, _)| x.is_some())
-                    .map(|(x, node)| (&mut **x.as_mut().unwrap(), node))
                     .for_each(|(child, nodes)| {
-                        run(herd, nodes, &mut *child, leaf_max_children, depth + 1)
+                        run(
+                            herd,
+                            nodes,
+                            &mut *child.as_mut().unwrap(),
+                            leaf_max_children,
+                            depth + 1,
+                        )
                     });
             }
         }
