@@ -47,19 +47,19 @@ fn test_parallel_inserts(bench: &mut Bencher) {
             let mut durations = vec![];
             let mut temp = vec![];
             for _ in 0..20 {
-                let herd = Herd::new();
+                let mut herd = Herd::new();
                 let start = Instant::now();
                 let nodes: Vec<_> = nodes
                     .iter()
                     .map(|node| herd.get().alloc(Node::new_point(node.0, node.1)))
                     .collect();
-                let tree = GenericTree::<'_, f64, 2, 4, usize>::new_in_par(&herd, nodes, 1.0, 10);
+                let tree = GenericTree::<'_, f64, 2, 4, usize>::new_in_par(&herd, nodes, 1.0, 3);
                 let duration = start.elapsed().as_millis();
                 durations.push(duration);
                 // let start = Instant::now();
                 temp.push(tree.num);
                 // DROP IN ANOTHER THREAD! IMPORTANT!
-                // pool.spawn(move || drop(tree));
+                pool.spawn(move || herd.reset());
                 // println!("drop {}ms", start.elapsed().as_millis());
             }
 

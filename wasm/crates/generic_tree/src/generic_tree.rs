@@ -768,7 +768,7 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
         mut nodes: Vec<&'bump mut Node<'bump, F, N, N2, D>>,
         min_dist: F,
         leaf_max_children: u32,
-    ) -> GenericTree<'bump, F, N, N2, D> {
+    ) -> &'bump mut GenericTree<'bump, F, N, N2, D> {
         let (max, min) = nodes
             .par_iter()
             .with_min_len(1000)
@@ -806,8 +806,9 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: Sync + S
             .try_into()
             .unwrap_or_else(|_| panic!());
 
-        let mut tree: GenericTree<'bump, F, N, N2, D> =
-            GenericTree::new(herd, bounds, min_dist, leaf_max_children);
+        let mut tree: &'bump mut GenericTree<'bump, F, N, N2, D> = herd
+            .get()
+            .alloc(GenericTree::new(herd, bounds, min_dist, leaf_max_children));
         tree.num = nodes.len() as u32;
 
         run(tree.herd, &mut nodes, &mut tree.root, leaf_max_children, 0);
