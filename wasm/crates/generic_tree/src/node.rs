@@ -303,6 +303,13 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         }
     }
 
+    pub fn region_data(&self) -> &D::RegionData {
+        match self {
+            Node::Region { data, .. } => data,
+            _ => panic!(),
+        }
+    }
+
     pub fn set_data(&mut self, value: D::PointData) {
         match self {
             Node::Point { coord: _, data } => {

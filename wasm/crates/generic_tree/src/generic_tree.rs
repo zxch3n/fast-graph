@@ -153,10 +153,8 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         self.find_closest_with_max_dist(point, F::infinity())
     }
 
-    /// 使用func: Fn(&Node<F, N, D>, usize) -> bool去后序遍历每一个节点
-    ///
-    /// 如果func返回true，那么该节点的子节点不会被访问
-    pub fn visit_post_order<FF>(&mut self, mut func: FF)
+    /// 使用func: Fn(&Node<F, N, D>, usize)去后序遍历每一个节点
+    pub fn visit_post_order_mut<FF>(&mut self, mut func: FF)
     where
         FF: FnMut(&mut Node<'bump, F, N, N2, D>, usize) -> (),
     {
@@ -198,6 +196,31 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
                 Node::Region { children, .. } => {
                     for child in children.iter().filter(|x| x.is_some()) {
                         stack.push((&*child.as_ref().unwrap(), depth + 1));
+                    }
+                }
+            }
+        }
+    }
+
+    /// 使用func: Fn(&Node<F, N, D>, usize) -> bool去先序遍历每一个节点
+    ///
+    /// 如果func返回true，那么该节点的子节点不会被访问
+    pub fn visit_pre_order_mut<FF>(&mut self, mut func: FF) -> ()
+    where
+        FF: FnMut(&mut Node<'bump, F, N, N2, D>, usize) -> bool,
+    {
+        let mut stack = vec![(self.root as *mut _, 0)];
+        while let Some((node, depth)) = stack.pop() {
+            let node = unsafe { &mut *node };
+            if func(node, depth) {
+                return;
+            }
+
+            match node {
+                Node::Point { coord: _, data: _ } => {}
+                Node::Region { children, .. } => {
+                    for child in children.iter_mut().filter(|x| x.is_some()) {
+                        stack.push((*child.as_mut().unwrap(), depth + 1));
                     }
                 }
             }

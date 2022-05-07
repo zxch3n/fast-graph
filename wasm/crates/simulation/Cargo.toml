@@ -1,0 +1,18 @@
+[package]
+name = "simulation"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+num = "0.4.0"
+rand= "0.8.5"
+lazy_static = "1.4.0"
+bumpalo = { version = "3.9.1", features=["collections", "boxed"] }
+bumpalo-herd = "0.1.1"
+generic_tree = {path = "../generic_tree"}
+
+[profile.dev]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
