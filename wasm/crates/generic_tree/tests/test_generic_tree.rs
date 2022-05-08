@@ -3,11 +3,17 @@
 extern crate test;
 use std::time::Instant;
 
-use generic_tree::{Bound, GenericTree, Node};
+use generic_tree::{Bound, GenericTree, Node, TreeData};
 use rand::Rng;
 use rayon::ThreadPoolBuilder;
 use test::{black_box, Bencher};
 extern crate rand;
+
+struct Data;
+impl TreeData for Data {
+    type PointData = usize;
+    type RegionData = usize;
+}
 
 #[bench]
 fn test_parallel_inserts(bench: &mut Bencher) {
@@ -49,7 +55,7 @@ fn test_parallel_inserts(bench: &mut Bencher) {
             for _ in 0..20 {
                 let nodes = nodes.clone();
                 let start = Instant::now();
-                let tree = GenericTree::<f64, 2, usize>::new_in_par(nodes, 1.0, 10);
+                let tree = GenericTree::<f64, 2, Data>::new_in_par(nodes, 1.0, 10);
                 let duration = start.elapsed().as_millis();
                 durations.push(duration);
                 // let start = Instant::now();
@@ -82,7 +88,7 @@ fn bench_single_thread_inserts(bench: &mut Bencher) {
                 ));
             }
         }
-        let mut tree = GenericTree::<f64, 2, usize>::new(
+        let mut tree = GenericTree::<f64, 2, Data>::new(
             [
                 Bound {
                     min: -1.0,
@@ -119,6 +125,6 @@ fn bench_single_thread(bench: &mut Bencher) {
             }
         }
 
-        GenericTree::<f64, 2, usize>::from_nodes(nodes, 1.0, 10);
+        GenericTree::<f64, 2, Data>::from_nodes(nodes, 1.0, 10);
     }));
 }

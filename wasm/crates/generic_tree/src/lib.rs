@@ -1,6 +1,8 @@
 #![allow(dead_code, unused_imports)]
 mod generic_tree;
+mod tree_data;
 pub use crate::generic_tree::{Bound, GenericTree, Node};
+pub use crate::tree_data::TreeData;
 use rayon::{join, prelude::*, ThreadPoolBuilder};
 
 pub fn parallel() {
