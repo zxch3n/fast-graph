@@ -1,6 +1,6 @@
 extern crate generic_tree;
 extern crate wasm_bindgen;
-use generic_tree::{parallel, Node};
+use generic_tree::{modname::Node, parallel};
 use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -37,7 +37,8 @@ pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
         )));
     }
 
-    let tree = generic_tree::GenericTree::<f64, 2, usize>::from_nodes(nodes, 0.1, 3);
+    let herd = Herd::new();
+    let tree = generic_tree::GenericTree::<f64, 2, usize>::from_nodes(&herd, nodes, 0.1, 3);
     // let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
     let data = *tree.find_closest(&[target[0], target[1]]).unwrap().data();
     rayon::spawn(move || drop(tree));
