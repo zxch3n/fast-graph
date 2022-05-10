@@ -4,7 +4,7 @@ extern crate test;
 use std::time::Instant;
 
 use bumpalo_herd::Herd;
-use generic_tree::{modname::Node, Bound, GenericTree, TreeData};
+use generic_tree::{Bound, GenericTree, Node, TreeData};
 use rand::Rng;
 use rayon::ThreadPoolBuilder;
 use test::{black_box, Bencher};

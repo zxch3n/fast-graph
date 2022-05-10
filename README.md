@@ -23,3 +23,7 @@ export async function init() {
 1. Press `Use this template` to create your project
 2. Clone from your repo
 3. Run `node scripts/init.js` to update `package.json` and `README.md`
+
+# Notice
+
+- Vite has [ infinite build issue on worker ](https://github.com/vitejs/vite/issues/7015) after 2.8.0. Before it's fixed we cannot upgrade vite.

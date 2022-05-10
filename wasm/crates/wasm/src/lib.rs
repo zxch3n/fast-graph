@@ -1,6 +1,7 @@
 extern crate generic_tree;
 extern crate wasm_bindgen;
-use generic_tree::{modname::Node, parallel};
+use bumpalo_herd::Herd;
+use generic_tree::{parallel, Node, TreeData};
 use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
 pub use wasm_bindgen_rayon::init_thread_pool;
@@ -27,21 +28,26 @@ pub fn js_parallel() {
     parallel();
 }
 
+struct Data;
+impl TreeData for Data {
+    type PointData = usize;
+    type RegionData = usize;
+}
+
 #[wasm_bindgen]
 pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
     let mut nodes = vec![];
     for i in (0..input.len()).step_by(2) {
-        nodes.push(Box::new(Node::<f64, 2, usize>::new_point(
+        nodes.push(Node::<'_, f64, 2, 4, Data>::new_point(
             [input[i], input[i + 1]],
             i / 2,
-        )));
+        ));
     }
 
     let herd = Herd::new();
-    let tree = generic_tree::GenericTree::<f64, 2, usize>::from_nodes(&herd, nodes, 0.1, 3);
+    let tree = generic_tree::GenericTree::<'_, f64, 2, 4, Data>::from_nodes(&herd, nodes, 0.1, 3);
     // let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
     let data = *tree.find_closest(&[target[0], target[1]]).unwrap().data();
-    rayon::spawn(move || drop(tree));
     data
 }
 
