@@ -39,6 +39,7 @@
     "@types/react": "^17.0.33",
     "@types/react-dom": "^17.0.10",
     "@vitejs/plugin-react": "^1.0.7",
+    "c8": "^7.11.2",
     "chance": "^1.1.7",
     "prettier": "^2.3.2",
     "standard-version": "^9.3.0",
