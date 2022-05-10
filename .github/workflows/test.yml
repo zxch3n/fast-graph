@@ -31,6 +31,7 @@ jobs:
         with:
           toolchain: nightly
           override: true
+          components: rust-src, rust-std
       - uses: jetli/wasm-pack-action@v0.3.0
         with:
           version: 'latest'
