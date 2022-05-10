@@ -1,7 +1,7 @@
 import { findInside, init } from "../src/wasm.ts";
 
 await init(4);
-let input = new Float64Array(new Array(1e3).fill(0).map(() => Math.random()));
+let input = new Float64Array(new Array(1e5).fill(0).map(() => Math.random()));
 await run();
 
 async function run() {
@@ -26,7 +26,7 @@ async function run() {
   const std = Math.sqrt(
     durations.reduce((a, b) => a + b * b, 0) / durations.length - mean * mean,
   );
-  console.log("4 threads tree insert 1k >> ", mean, "ms +-", std);
+  console.log("4 threads tree insert 100k >> ", mean, "ms +-", std);
 }
 
 async function target() {
