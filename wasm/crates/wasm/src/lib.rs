@@ -45,7 +45,7 @@ pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
     }
 
     let herd = Herd::new();
-    let tree = generic_tree::GenericTree::<'_, f64, 2, 4, Data>::from_nodes(&herd, nodes, 0.1, 3);
+    let tree = generic_tree::GenericTree::<'_, f64, 2, 4, Data>::new_in_par(&herd, nodes, 0.1, 3);
     // let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
     let data = *tree.find_closest(&[target[0], target[1]]).unwrap().data();
     data
