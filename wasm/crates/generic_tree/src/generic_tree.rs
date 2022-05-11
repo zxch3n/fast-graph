@@ -342,34 +342,18 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: TreeData
         min_dist: F,
         leaf_max_children: u32,
     ) -> &'bump mut GenericTree<'bump, F, N, N2, D> {
-        let (max, min) = nodes
-            .par_iter()
-            .with_min_len(1000)
-            .fold(
-                || ([F::neg_infinity(); N], [F::infinity(); N]),
-                |(mut max_coord, mut min_coord), node| {
-                    let coord = node.coord();
-                    for i in 0..N {
-                        max_coord[i] = max_coord[i].max(coord[i]);
-                        min_coord[i] = min_coord[i].min(coord[i]);
-                    }
+        let (max, min) = nodes.iter().fold(
+            ([F::neg_infinity(); N], [F::infinity(); N]),
+            |(mut max_coord, mut min_coord), node| {
+                let coord = node.coord();
+                for i in 0..N {
+                    max_coord[i] = max_coord[i].max(coord[i]);
+                    min_coord[i] = min_coord[i].min(coord[i]);
+                }
 
-                    (max_coord, min_coord)
-                },
-            )
-            .reduce(
-                || ([F::neg_infinity(); N], [F::infinity(); N]),
-                |(max_coord1, min_coord1), (max_coord2, min_coord2)| {
-                    let mut min_coord = [F::neg_infinity(); N];
-                    let mut max_coord = [F::infinity(); N];
-                    for i in 0..N {
-                        min_coord[i] = max_coord1[i].max(max_coord2[i]);
-                        max_coord[i] = min_coord1[i].min(min_coord2[i]);
-                    }
-
-                    (min_coord, max_coord)
-                },
-            );
+                (max_coord, min_coord)
+            },
+        );
 
         let bounds: [Bound<F>; N] = min
             .into_iter()
