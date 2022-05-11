@@ -35,6 +35,9 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.3.0
         with:
           version: 'latest'
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: '1.21.2'
       - uses: pnpm/action-setup@v2.0.1
         name: Install pnpm
         id: pnpm-install
@@ -61,6 +64,8 @@ jobs:
         run: pnpm build
       - name: Run Tests
         run: pnpm test -- --coverage
+      - name: Run Deno Tests
+        run: pnpm test:deno
       # - uses: codecov/codecov-action@v1
       #   with:
       #     token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos

@@ -1,11 +1,10 @@
-import { findInside, init } from "../src/wasm.ts";
+import { findInside, init } from "./wasmEntry.ts";
 import { expect } from "./utils.ts";
 
 await init();
 Deno.test({
   name: "tree",
   fn: async () => {
-    console.log("HHHHHHHHHHHHH");
     expect(await findInside(new Float64Array([0, 0, 1, 1, 2, 2]), [1, 1])).toBe(
       1,
     );
