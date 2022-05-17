@@ -1,8 +1,7 @@
-import { add } from '../src';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-describe('add', () => {
-  it('adds two numbers', () => {
-    expect(add(1, 1)).toBe(2);
+describe("add", () => {
+  it("adds two numbers", () => {
+    expect(1 + 1).toBe(2);
   });
 });

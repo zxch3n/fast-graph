@@ -1,1 +1,1 @@
-export {add} from './add'
+export const a = 0;

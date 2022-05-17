@@ -32,9 +32,7 @@ export default defineConfig({
       },
     },
   },
-  server: {
-    fs: { allow: ["."] },
-  },
+  // @ts-ignore
   test: {
     dir: "./test",
   },
