@@ -154,7 +154,31 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         self.find_closest_with_max_dist(point, F::infinity())
     }
 
-    pub fn visit<FF>(&self, func: FF) -> ()
+    pub fn visit_post_order<FF>(&mut self, mut func: FF)
+    where
+        FF: FnMut(&mut Node<'bump, F, N, N2, D>, usize) -> (),
+    {
+        let mut stack = vec![(self.root as *mut _, 0, true)];
+        while let Some((node, depth, is_first)) = stack.pop() {
+            let node = unsafe { &mut *node };
+            if !is_first {
+                func(node, depth);
+                return;
+            }
+
+            stack.push((node, depth, false));
+            match node {
+                Node::Point { coord: _, data: _ } => {}
+                Node::Region { children, .. } => {
+                    for child in children.iter_mut().filter(|x| x.is_some()) {
+                        stack.push((*child.as_mut().unwrap(), depth + 1, true));
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn visit_pre_order<FF>(&self, func: FF) -> ()
     where
         FF: Fn(&Node<'bump, F, N, N2, D>, usize) -> bool,
     {
@@ -181,7 +205,7 @@ impl<'bump, F: Float + Display + Send + Sync, const N: usize, const N2: usize, D
 {
     fn debug(&self) {
         let space = String::from(" ");
-        self.visit(|node, depth| match node {
+        self.visit_pre_order(|node, depth| match node {
             Node::Point { coord, data } => {
                 let mut s = String::new();
                 for i in 0..N {
