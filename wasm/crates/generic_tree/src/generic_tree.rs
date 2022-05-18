@@ -163,12 +163,12 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
             let node = unsafe { &mut *node };
             if !is_first {
                 func(node, depth);
-                return;
+                continue;
             }
 
             stack.push((node, depth, false));
             match node {
-                Node::Point { coord: _, data: _ } => {}
+                Node::Point { .. } => {}
                 Node::Region { children, .. } => {
                     for child in children.iter_mut().filter(|x| x.is_some()) {
                         stack.push((*child.as_mut().unwrap(), depth + 1, true));
