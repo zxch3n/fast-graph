@@ -1,4 +1,4 @@
-use crate::force_data::PointForceData;
+use crate::force_data::{PointData, PointForceData};
 use lazy_static::lazy_static;
 use num::Float;
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ lazy_static! {
 /// 物理模拟
 pub struct Simulation<F: Float, const N: usize, D> {
     /// 真实数据列表，用以初始化，初始化后将被封装在ForceNode节点中持有引用
-    pub force_point_data: Vec<PointForceData<F, N, D>>,
+    pub force_point_data: Vec<PointData<F, N, D>>,
     /// 全部物理力
     pub forces: HashMap<String, Box<dyn ForceSimulate<F, N, D>>>,
     /// 每一时间刻，会降低alpha（根据alpha_decay和alpha_target），当alpha小于alpha_min，将停止物理模拟
@@ -26,8 +26,8 @@ pub struct Simulation<F: Float, const N: usize, D> {
 }
 
 pub trait ForceSimulate<F: Float, const N: usize, D> {
-    fn init(&mut self, force_point_data: &[PointForceData<F, N, D>]);
-    fn force(&self, force_point_data: &mut [PointForceData<F, N, D>], alpha: F);
+    fn init(&mut self, force_point_data: &[PointData<F, N, D>]);
+    fn force(&self, force_point_data: &mut [PointData<F, N, D>], alpha: F);
 }
 
 impl<F: Float, const N: usize, D> Default for Simulation<F, N, D> {
@@ -95,7 +95,7 @@ impl<F: Float, const N: usize, D> Simulation<F, N, D> {
         }
     }
 
-    fn init_point_data(data: Vec<D>) -> Vec<PointForceData<F, N, D>> {
+    fn init_point_data(data: Vec<D>) -> Vec<PointData<F, N, D>> {
         let mut nodes = Vec::with_capacity(data.len());
         for (idx, datum) in data.into_iter().enumerate() {
             let idx_f = idx as f64;
@@ -122,7 +122,7 @@ impl<F: Float, const N: usize, D> Simulation<F, N, D> {
                 }
                 _ => panic!("unsupported dim > 3 "),
             };
-            nodes.push(PointForceData::from_data(datum, coord, idx))
+            nodes.push(PointData::from_data(datum, coord, idx))
         }
         nodes
     }

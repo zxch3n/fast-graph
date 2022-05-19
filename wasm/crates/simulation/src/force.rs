@@ -1,4 +1,4 @@
-use crate::force_data::{ForceData, PointForceData};
+use crate::force_data::{ForceData, PointData, PointForceData};
 use crate::simulation::ForceSimulate;
 use bumpalo_herd::Herd;
 use generic_tree::{GenericTree, Node};
@@ -20,7 +20,7 @@ pub struct NBodyForce<F: Float, const N: usize, const N2: usize, D> {
     pub distance_min: F,
     pub distance_max: F,
     pub theta: F,
-    pub strength_fn: fn(&[PointForceData<F, N, D>], usize) -> F,
+    pub strength_fn: fn(&[PointData<F, N, D>], usize) -> F,
     pub strengths: Vec<F>,
 }
 
@@ -86,7 +86,7 @@ impl<
 
     fn apply(
         &self,
-        point_data: &mut PointForceData<F, N, D>,
+        point_data: &mut PointData<F, N, D>,
         node: &Node<F, N, N2, ForceData<F, N, D>>,
         alpha: F,
     ) -> bool {
@@ -156,14 +156,14 @@ impl<
         D: Default + Display + Clone + Send + Sync,
     > ForceSimulate<F, N, D> for NBodyForce<F, N, N2, D>
 {
-    fn init(&mut self, force_point_data: &[PointForceData<F, N, D>]) {
+    fn init(&mut self, force_point_data: &[PointData<F, N, D>]) {
         for idx in 0..force_point_data.len() {
             self.strengths
                 .push((self.strength_fn)(force_point_data, idx))
         }
     }
 
-    fn force(&self, force_point_data: &mut [PointForceData<F, N, D>], alpha: F) {
+    fn force(&self, force_point_data: &mut [PointData<F, N, D>], alpha: F) {
         // for point_data in force_point_data.iter() {
         //     println!("更新前数据 {}", point_data)
         // }
@@ -172,11 +172,12 @@ impl<
         let tree = GenericTree::<F, N, N2, ForceData<F, N, D>>::new_in_par(
             &herd,
             force_point_data
-                .to_vec()
-                .into_iter()
+                .iter_mut()
                 .map(|point_data| {
-                    herd.get()
-                        .alloc(Node::new_point(point_data.coord, point_data))
+                    herd.get().alloc(Node::new_point(
+                        point_data.coord,
+                        PointForceData::from_point_data(point_data),
+                    ))
                 })
                 .collect::<Vec<_>>(),
             // TODO 参数设置

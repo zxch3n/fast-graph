@@ -1,7 +1,10 @@
 use generic_tree::TreeData;
 use num::Float;
+use std::borrow::BorrowMut;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
+use std::ptr::Unique;
 
 pub struct ForceData<F, const N: usize, D> {
     _float_marker: PhantomData<F>,
@@ -10,6 +13,48 @@ pub struct ForceData<F, const N: usize, D> {
 
 #[derive(Clone)]
 pub struct PointForceData<F: Float, const N: usize, D> {
+    ptr: Unique<PointData<F, N, D>>,
+}
+
+impl<F: Float, const N: usize, D> PointForceData<F, N, D> {
+    pub fn from_point_data(point_data: &mut PointData<F, N, D>) -> PointForceData<F, N, D> {
+        PointForceData {
+            ptr: Unique::new(point_data).unwrap(),
+        }
+    }
+}
+
+/// TODO PointForceData不该有Default？
+impl<F: Float, const N: usize, D: Default> Default for PointForceData<F, N, D> {
+    fn default() -> Self {
+        PointForceData {
+            ptr: Unique::new(PointData::default().borrow_mut()).unwrap(),
+        }
+    }
+}
+
+impl<F: Float, const N: usize, D: Default> Display for PointForceData<F, N, D> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", &(self.ptr.as_ptr()))
+    }
+}
+
+impl<F: Float, const N: usize, D: Default> Deref for PointForceData<F, N, D> {
+    type Target = PointData<F, N, D>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.as_ref() }
+    }
+}
+
+impl<F: Float, const N: usize, D: Default> DerefMut for PointForceData<F, N, D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.ptr.as_mut() }
+    }
+}
+
+#[derive(Clone)]
+pub struct PointData<F: Float, const N: usize, D> {
     pub data: D,
     pub index: usize,
     pub coord: [F; N],
@@ -25,7 +70,7 @@ pub struct RegionForceData<F: Float, const N: usize> {
     pub strength: F,
 }
 
-impl<F: Float, const N: usize, D: Default> Default for PointForceData<F, N, D> {
+impl<F: Float, const N: usize, D: Default> Default for PointData<F, N, D> {
     fn default() -> Self {
         Self {
             data: D::default(),
@@ -38,7 +83,7 @@ impl<F: Float, const N: usize, D: Default> Default for PointForceData<F, N, D> {
     }
 }
 
-impl<F: Float, const N: usize, D: Display> Display for PointForceData<F, N, D> {
+impl<F: Float, const N: usize, D: Display> Display for PointData<F, N, D> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -104,8 +149,8 @@ impl<F: Float, const N: usize, D: Display + Clone + Default> TreeData for ForceD
     }
 }
 
-impl<F: Float, const N: usize, D> PointForceData<F, N, D> {
-    pub fn from_data(data: D, coord: [F; N], index: usize) -> PointForceData<F, N, D> {
+impl<F: Float, const N: usize, D> PointData<F, N, D> {
+    pub fn from_data(data: D, coord: [F; N], index: usize) -> PointData<F, N, D> {
         Self {
             data,
             coord,
