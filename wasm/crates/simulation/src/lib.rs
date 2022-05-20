@@ -1,4 +1,4 @@
 #![feature(ptr_internals)]
-mod force;
-mod force_data;
-mod simulation;
+pub mod force;
+pub mod force_data;
+pub mod simulation;
