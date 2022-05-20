@@ -1,20 +1,10 @@
-use crate::force_data::{ForceData, PointData, PointForceData};
-use crate::simulation::ForceSimulate;
+use crate::data::{ForceData, PointData, PointForceData};
+use crate::force::utils::{about_zero, jiggle};
+use crate::force::ForceSimulate;
 use bumpalo_herd::Herd;
 use generic_tree::{GenericTree, Node};
 use num::Float;
-use rand::rngs::ThreadRng;
-use rand::Rng;
 use std::fmt::{Debug, Display, Formatter};
-
-fn jiggle<F: Float>(rng: &mut ThreadRng) -> F {
-    let x = rng.gen_range(0.0..=1.0);
-    F::from((x - 0.5) * 1e-6).unwrap()
-}
-
-fn about_zero<F: Float>(x: F) -> bool {
-    x.abs() <= F::epsilon()
-}
 
 pub struct NBodyForce<F: Float, const N: usize, const N2: usize, D> {
     pub distance_min: F,
@@ -183,7 +173,7 @@ impl<
                 .collect::<Vec<_>>(),
             // TODO 参数设置
             F::infinity(),
-            (N.pow(2_u32) - 1) as u32,
+            1, //(N.pow(2_u32) - 1) as u32,
         );
         tree.visit_post_order_mut(|node, _| self.accumulate(node));
         for point_data in force_point_data.iter_mut() {

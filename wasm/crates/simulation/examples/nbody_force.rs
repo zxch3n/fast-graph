@@ -3,7 +3,7 @@ use plotters::coord::types::RangedCoordf32;
 use plotters::prelude::*;
 use rand::prelude::*;
 use simulation::force::NBodyForce;
-use simulation::simulation::Simulation;
+use simulation::Simulation;
 use std::fmt::{Display, Formatter};
 use std::time::Instant;
 

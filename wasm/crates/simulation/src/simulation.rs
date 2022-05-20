@@ -1,4 +1,5 @@
-use crate::force_data::{PointData, PointForceData};
+use crate::data::PointData;
+use crate::force::ForceSimulate;
 use lazy_static::lazy_static;
 use num::Float;
 use std::collections::HashMap;
@@ -23,11 +24,6 @@ pub struct Simulation<F: Float, const N: usize, D> {
     alpha_target: F,
     /// 每一时间刻，节点速度下降率
     velocity_decay: F,
-}
-
-pub trait ForceSimulate<F: Float, const N: usize, D> {
-    fn init(&mut self, force_point_data: &[PointData<F, N, D>]);
-    fn force(&self, force_point_data: &mut [PointData<F, N, D>], alpha: F);
 }
 
 impl<F: Float, const N: usize, D> Default for Simulation<F, N, D> {
@@ -129,7 +125,8 @@ impl<F: Float, const N: usize, D> Simulation<F, N, D> {
 }
 
 mod tests {
-    use crate::{force::NBodyForce, simulation::Simulation};
+    use crate::force::NBodyForce;
+    use crate::simulation::Simulation;
     use generic_tree::Node;
     use std::time::Instant;
 
