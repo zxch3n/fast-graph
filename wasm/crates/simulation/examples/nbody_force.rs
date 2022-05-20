@@ -72,7 +72,7 @@ fn main() {
         -128f32..128f32,
         (0..640, 0..640),
     ));
-    let mut sim = build_simulation(20);
+    let mut sim = build_simulation(100);
     for i in 0..=30 {
         println!("draw {}/30", i);
         area.fill(&RGBColor(240, 200, 200)).unwrap();

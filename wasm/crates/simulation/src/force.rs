@@ -90,6 +90,7 @@ impl<
         node: &Node<F, N, N2, ForceData<F, N, D>>,
         alpha: F,
     ) -> bool {
+        let n_dim = N as i32;
         let mut rnd = rand::thread_rng();
         // FIXME node的strength 是否会存在未被初始化
         let (_strength, _coord) = match node {
@@ -103,17 +104,17 @@ impl<
         };
         let mut l = F::zero();
         for i in 0..N {
-            l = l + F::powi(_coord[i] - point_data.coord[i], 2)
+            l = l + F::powi(_coord[i] - point_data.coord[i], n_dim)
         }
-        if F::powi(w, 2) / self.theta.powi(2) < l {
-            if l < self.distance_max.powi(2) {
+        if F::powi(w / self.theta, n_dim) < l {
+            if l < self.distance_max.powi(n_dim) {
                 for i in 0..N {
                     if about_zero(_coord[i] - point_data.coord[i]) {
                         let _x: F = jiggle::<F>(&mut rnd);
-                        l = l + _x.powi(2)
+                        l = l + _x.powi(n_dim)
                     }
-                    if l < self.distance_min.powi(2) {
-                        let _t: F = self.distance_min.powi(2) * l;
+                    if l < self.distance_min.powi(n_dim) {
+                        let _t: F = self.distance_min.powi(n_dim) * l;
                         l = _t.sqrt()
                     }
                     for j in 0..N {
@@ -123,7 +124,7 @@ impl<
                 }
             }
             return true;
-        } else if node.is_region() || l >= self.distance_max.powi(2) {
+        } else if node.is_region() || l >= self.distance_max.powi(n_dim) {
             return false;
         }
         // point node
@@ -131,10 +132,10 @@ impl<
             for i in 0..N {
                 if about_zero(_coord[i] - point_data.coord[i]) {
                     let _x: F = jiggle::<F>(&mut rnd);
-                    l = l + _x.powi(2)
+                    l = l + _x.powi(n_dim)
                 }
-                if l < self.distance_min.powi(2) {
-                    let _t: F = self.distance_min.powi(2) * l;
+                if l < self.distance_min.powi(n_dim) {
+                    let _t: F = self.distance_min.powi(n_dim) * l;
                     l = _t.sqrt()
                 }
             }
