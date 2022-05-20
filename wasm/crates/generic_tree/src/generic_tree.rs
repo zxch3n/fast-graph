@@ -188,7 +188,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         let mut stack = vec![(&self.root, 0)];
         while let Some((node, depth)) = stack.pop() {
             if func(&node, depth) {
-                return;
+                continue;
             }
 
             match node {
@@ -213,7 +213,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         while let Some((node, depth)) = stack.pop() {
             let node = unsafe { &mut *node };
             if func(node, depth) {
-                return;
+                continue;
             }
 
             match node {
