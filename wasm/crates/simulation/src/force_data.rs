@@ -7,8 +7,7 @@ use std::ops::{Deref, DerefMut};
 use std::ptr::Unique;
 
 pub struct ForceData<F, const N: usize, D> {
-    _float_marker: PhantomData<F>,
-    _data_marker: PhantomData<D>,
+    _marker: PhantomData<(F, D)>,
 }
 
 #[derive(Clone)]

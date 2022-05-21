@@ -16,6 +16,14 @@ pub struct Bound<F: Float> {
     pub max: F,
 }
 
+impl<F: Float> PartialEq for Bound<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.min == other.min && self.max == other.max
+    }
+}
+
+impl<F: Float> Eq for Bound<F> {}
+
 impl<F: Float + Display> Display for Bound<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "[min: {}, max: {}]", self.min, self.max)
@@ -166,14 +174,17 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
                 continue;
             }
 
-            stack.push((node, depth, false));
-            match node {
-                Node::Point { .. } => {}
-                Node::Region { children, .. } => {
-                    for child in children.iter_mut().filter(|x| x.is_some()) {
-                        stack.push((*child.as_mut().unwrap(), depth + 1, true));
+            if node.is_region() {
+                stack.push((node, depth, false));
+                if let Node::Region { children, .. } = node {
+                    for child in children.iter_mut().rev() {
+                        if let Some(child) = child {
+                            stack.push((*child, depth + 1, true));
+                        }
                     }
                 }
+            } else {
+                func(node, depth)
             }
         }
     }
@@ -540,12 +551,64 @@ impl<F: Float, const N: usize> Distance<F> for [F; N] {
 }
 
 mod tests {
+    use super::{Bound, GenericTree, Node};
+    use crate::tree_data::TreeData;
     use bumpalo_herd::Herd;
     use std::thread;
 
-    use crate::tree_data::TreeData;
+    #[test]
+    fn test_post_visit() {
+        let herd = Herd::new();
+        let mut tree: GenericTree<'_, f64, 2, 4, Data> = GenericTree::new(
+            &herd,
+            [
+                Bound {
+                    min: -1.0,
+                    max: 101.0,
+                },
+                Bound {
+                    min: -1.0,
+                    max: 101.0,
+                },
+            ],
+            0.1,
+            1,
+        );
 
-    use super::{Bound, GenericTree, Node};
+        for i in 0..100 {
+            tree.add([(i) as f64, (i) as f64], i).unwrap();
+            let mut visit_order = vec![];
+            tree.visit_post_order_mut(|node, _| match node {
+                Node::Point { coord, .. } => visit_order.push((Some(coord.clone()), None, 0)),
+                Node::Region {
+                    bounds, children, ..
+                } => visit_order.push((
+                    None,
+                    Some(bounds.clone()),
+                    children.into_iter().filter(|x| x.is_some()).count(),
+                )),
+            });
+
+            let mut visit_order_2 = vec![];
+            tree.root.visit_post_order(&mut |node| match node {
+                Node::Point { coord, .. } => {
+                    visit_order_2.push((Some(coord.clone()), None, 0));
+                }
+                Node::Region {
+                    bounds, children, ..
+                } => {
+                    visit_order_2.push((
+                        None,
+                        Some(bounds.clone()),
+                        children.into_iter().filter(|x| x.is_some()).count(),
+                    ));
+                }
+            });
+
+            assert_eq!(visit_order.len(), visit_order_2.len());
+            assert_eq!(visit_order, visit_order_2);
+        }
+    }
 
     struct Data;
     impl TreeData for Data {

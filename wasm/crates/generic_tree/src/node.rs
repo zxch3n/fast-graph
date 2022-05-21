@@ -319,6 +319,23 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         }
     }
 
+    pub fn visit_post_order<FF>(&self, func: &mut FF)
+    where
+        FF: FnMut(&Self) -> (),
+    {
+        if self.is_region() {
+            if let Node::Region { children, .. } = self {
+                for child in children.iter() {
+                    if let Some(child) = child {
+                        child.visit_post_order(func);
+                    }
+                }
+            }
+        }
+
+        func(self);
+    }
+
     #[cfg(not(debug_assertions))]
     pub(crate) fn check(&self) -> Result<(), ()> {
         Ok(())
