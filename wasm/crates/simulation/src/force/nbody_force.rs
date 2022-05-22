@@ -6,30 +6,13 @@ use generic_tree::{GenericTree, Node, TreeData};
 use num::Float;
 use std::fmt::{Debug, Display, Formatter};
 
-fn print_node_data<
-    F: Float + Send + Sync,
-    const N: usize,
-    const N2: usize,
-    D: Clone + Send + Sync + Default + Display,
->(
-    node: &Node<F, N, N2, ForceData<F, N, D>>,
-) {
-    match node {
-        Node::Point { data, .. } => {
-            println!("{}", data as &PointData<F, N, D>)
-        }
-        Node::Region { data, .. } => {
-            println!("{}", data)
-        }
-    };
-}
-
 pub struct NBodyForce<F: Float, const N: usize, const N2: usize, D> {
     pub distance_min: F,
     pub distance_max: F,
     pub theta: F,
-    pub strength_fn: fn(&[PointData<F, N, D>], usize) -> F,
-    pub strengths: Vec<F>,
+    pub strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> F,
+    strengths: Vec<F>,
+    force_point_data: Option<*const [PointData<F, N, D>]>,
 }
 
 impl<F: Float, const N: usize, const N2: usize, D> Default for NBodyForce<F, N, N2, D> {
@@ -40,6 +23,7 @@ impl<F: Float, const N: usize, const N2: usize, D> Default for NBodyForce<F, N, 
             theta: F::from(0.9_f64).unwrap(),
             strength_fn: |_, _| F::from(-30_f64).unwrap(),
             strengths: Vec::new(),
+            force_point_data: None,
         }
     }
 }
@@ -55,6 +39,7 @@ impl<F: Float, const N: usize, const N2: usize, D> Debug for NBodyForce<F, N, N2
 }
 
 impl<
+        'd,
         F: Float + Send + Sync,
         const N: usize,
         const N2: usize,
@@ -171,6 +156,17 @@ impl<
             true
         }
     }
+
+    fn _set_strength(&mut self) {
+        if let Some(force_point_data) = self.force_point_data {
+            unsafe {
+                (&*force_point_data).iter().for_each(|point_data| {
+                    self.strengths[point_data.index] =
+                        (self.strength_fn)(point_data, &*force_point_data)
+                })
+            }
+        }
+    }
 }
 
 impl<
@@ -181,10 +177,9 @@ impl<
     > ForceSimulate<F, N, D> for NBodyForce<F, N, N2, D>
 {
     fn init(&mut self, force_point_data: &[PointData<F, N, D>]) {
-        for idx in 0..force_point_data.len() {
-            self.strengths
-                .push((self.strength_fn)(force_point_data, idx))
-        }
+        self.force_point_data = Some(force_point_data as *const [PointData<F, N, D>]);
+        self.strengths = vec![F::zero(); force_point_data.len()];
+        self._set_strength()
     }
 
     fn force(&self, force_point_data: &mut [PointData<F, N, D>], alpha: F) {

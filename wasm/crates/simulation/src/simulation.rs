@@ -26,7 +26,7 @@ pub struct Simulation<F: Float, const N: usize, D> {
     velocity_decay: F,
 }
 
-impl<F: Float, const N: usize, D> Default for Simulation<F, N, D> {
+impl<'d, F: Float, const N: usize, D> Default for Simulation<F, N, D> {
     fn default() -> Self {
         Simulation {
             force_point_data: Vec::new(),
@@ -155,8 +155,8 @@ mod tests {
 
     #[test]
     fn test_nbody_force() {
-        let mut simulation: Simulation<f64, 2, i32> = Simulation::from_data(vec![1, 2, 3]);
         let nbody_force = NBodyForce::<f64, 2, 4, i32>::default();
+        let mut simulation: Simulation<f64, 2, i32> = Simulation::from_data(vec![1, 2, 3]);
         simulation.add_force(String::from("n-body"), Box::new(nbody_force));
         for (index, data) in simulation.force_point_data.iter().enumerate() {
             let v = data.velocity;
