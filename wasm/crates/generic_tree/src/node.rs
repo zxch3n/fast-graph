@@ -69,6 +69,13 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         }
     }
 
+    pub fn has_children(&self) -> bool {
+        match self {
+            Node::Point { coord: _, data: _ } => false,
+            Node::Region { children, .. } => children.iter().any(|child| child.is_some()),
+        }
+    }
+
     pub fn new_point(coord: [F; N], data: D::PointData) -> Self {
         Node::Point { coord, data }
     }
