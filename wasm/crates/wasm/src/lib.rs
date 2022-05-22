@@ -1,6 +1,9 @@
 extern crate generic_tree;
+extern crate simulation;
 extern crate wasm_bindgen;
+mod force_graph;
 use bumpalo_herd::Herd;
+pub use force_graph::ForceGraph2D;
 use generic_tree::{parallel, Node, TreeData};
 use rayon::prelude::*;
 use wasm_bindgen::prelude::*;
