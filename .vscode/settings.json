@@ -8,5 +8,11 @@
     "**/dist/**",
     "**/cypress/**",
     "**/.{idea,git,cache,output,temp}/**"
-  ]
+  ],
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  }
 }
