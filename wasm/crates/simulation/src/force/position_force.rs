@@ -12,7 +12,7 @@ pub struct PositionForce<F: Float, const N: usize, D> {
     force_point_data: Option<*const [PointData<F, N, D>]>,
 }
 
-impl<'d, F: Float, const N: usize, D> PositionForce<F, N, D> {
+impl<F: Float, const N: usize, D> PositionForce<F, N, D> {
     pub fn new(
         target_position_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> [Option<F>; N],
         strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> [Option<F>; N],

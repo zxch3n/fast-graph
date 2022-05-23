@@ -39,7 +39,6 @@ impl<F: Float, const N: usize, const N2: usize, D> Debug for NBodyForce<F, N, N2
 }
 
 impl<
-        'd,
         F: Float + Send + Sync,
         const N: usize,
         const N2: usize,
