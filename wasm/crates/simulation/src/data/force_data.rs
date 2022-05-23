@@ -61,8 +61,9 @@ impl<F: Float, const N: usize, D: Default> DerefMut for PointForceData<F, N, D> 
 #[derive(Clone)]
 pub struct RegionForceData<F: Float, const N: usize> {
     /// weighted coord
-    pub coord: [F; N],
-    pub strength: F,
+    pub coord: Option<[F; N]>,
+    pub strength: Option<F>,
+    pub radius: Option<F>,
 }
 
 impl<F: Float + Send + Sync, const N: usize> Display for RegionForceData<F, N> {
@@ -71,10 +72,11 @@ impl<F: Float + Send + Sync, const N: usize> Display for RegionForceData<F, N> {
             f,
             "RegionForceData(coord: {:?}, strength: {:?})",
             self.coord
+                .unwrap_or([F::nan(); N])
                 .iter()
                 .map(|point| point.to_f64().unwrap())
                 .collect::<Vec<_>>(),
-            self.strength.to_f64().unwrap()
+            self.strength.unwrap_or(F::nan()).to_f64().unwrap()
         )
     }
 }
@@ -82,8 +84,9 @@ impl<F: Float + Send + Sync, const N: usize> Display for RegionForceData<F, N> {
 impl<F: Float + Send + Sync, const N: usize> Default for RegionForceData<F, N> {
     fn default() -> Self {
         Self {
-            coord: [F::zero(); N],
-            strength: F::zero(),
+            coord: None,
+            strength: None,
+            radius: None,
         }
     }
 }

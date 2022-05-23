@@ -8,6 +8,7 @@ pub struct PointData<F: Float, const N: usize, D> {
     pub coord: [F; N],
     pub velocity: [F; N],
     pub strength: F,
+    pub radius: F,
     pub fixed_position: Option<[F; N]>,
 }
 
@@ -19,6 +20,7 @@ impl<F: Float, const N: usize, D> PointData<F, N, D> {
             index,
             velocity: [F::zero(); N],
             strength: F::zero(),
+            radius: F::zero(),
             fixed_position: None,
         }
     }
@@ -40,6 +42,7 @@ impl<F: Float, const N: usize, D: Default> Default for PointData<F, N, D> {
             coord: [F::zero(); N],
             velocity: [F::zero(); N],
             strength: F::zero(),
+            radius: F::zero(),
             fixed_position: None,
         }
     }

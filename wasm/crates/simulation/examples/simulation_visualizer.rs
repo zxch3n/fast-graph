@@ -2,7 +2,7 @@
 use plotters::coord::types::RangedCoordf32;
 use plotters::prelude::*;
 use rand::prelude::*;
-use simulation::force::NBodyForce;
+use simulation::force::{CenterForce, NBodyForce, PositionForce};
 use simulation::Simulation;
 use std::fmt::{Display, Formatter};
 use std::time::Instant;
@@ -27,7 +27,7 @@ impl Display for RandomData {
     }
 }
 
-fn build_simulation(node_num: usize) -> Simulation<f64, 2, RandomData> {
+fn build_simulation<'s>(node_num: usize) -> Simulation<f64, 2, RandomData> {
     let mut data = Vec::with_capacity(node_num);
     for _ in 0..node_num {
         data.push(RandomData::default())
@@ -37,6 +37,10 @@ fn build_simulation(node_num: usize) -> Simulation<f64, 2, RandomData> {
         String::from("n-body"),
         Box::new(NBodyForce::<f64, 2, 4, RandomData>::default()),
     );
+    let mut position_force = PositionForce::default();
+    position_force.set_strength_fn(|_, _| [Some(1f64); 2]);
+    simulation.add_force(String::from("position"), Box::new(position_force));
+    simulation.add_force(String::from("center"), Box::new(CenterForce::default()));
     simulation
 }
 
