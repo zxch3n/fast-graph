@@ -1,6 +1,9 @@
 use std::fmt::{Display, Formatter};
 
-use simulation::{force::NBodyForce, Simulation};
+use simulation::{
+    force::{CenterForce, NBodyForce, PositionForce},
+    Simulation,
+};
 use wasm_bindgen::prelude::*;
 
 #[derive(Clone)]
@@ -35,11 +38,6 @@ impl ForceGraph2D {
         }
         let mut node_positions = vec![(0., 0.); node_num];
         let mut simulation: Simulation<f64, 2, RandomData> = Simulation::from_data(data);
-        simulation.add_force(
-            String::from("n-body"),
-            Box::new(NBodyForce::<f64, 2, 4, RandomData>::default()),
-        );
-
         for (i, point) in simulation.force_point_data.iter().enumerate() {
             node_positions[i] = (point.coord[0], point.coord[1]);
         }
@@ -50,7 +48,28 @@ impl ForceGraph2D {
         }
     }
 
-    pub fn tick(&mut self, times: usize) {
+    pub fn add_n_body_force(&mut self, name: String) {
+        self.simulation.add_force(
+            name,
+            Box::new(NBodyForce::<f64, 2, 4, RandomData>::default()),
+        );
+    }
+
+    pub fn add_center_force(&mut self) {
+        self.simulation.add_force(
+            String::from("official:center-force"),
+            Box::new(CenterForce::default()),
+        );
+    }
+
+    pub fn tick(&mut self, times: usize, changed: bool) {
+        if changed {
+            for (i, point) in self.simulation.force_point_data.iter_mut().enumerate() {
+                point.coord[0] = self.node_positions[i].0;
+                point.coord[1] = self.node_positions[i].1;
+            }
+        }
+
         for _ in 0..times {
             self.simulation.tick();
         }

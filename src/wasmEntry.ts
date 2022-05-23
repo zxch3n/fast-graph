@@ -20,7 +20,7 @@ export function findInside(
 
 export class Graph2D {
   positions: Float64Array | undefined;
-  private graph: ForceGraph2D | undefined;
+  public graph: ForceGraph2D | undefined;
   private memory: WebAssembly.Memory | undefined;
   private destroyed = false;
   constructor(private num: number) {}
@@ -34,14 +34,19 @@ export class Graph2D {
     this.memory = memory;
     this.graph = ForceGraph2D.from_random(this.num);
     this.positions = new Float64Array(
-      memory.buffer,
-      this.graph.get_pos(),
+      this.memory!.buffer,
+      this.graph!.get_pos(),
       this.num * 2,
     );
   }
 
-  tick() {
-    this.graph!.tick(1);
+  tick(times = 1, changed = false) {
+    this.graph!.tick(times, changed);
+    this.positions = new Float64Array(
+      this.memory!.buffer,
+      this.graph!.get_pos(),
+      this.num * 2,
+    );
   }
 
   dispose() {
