@@ -63,6 +63,7 @@ pub struct RegionForceData<F: Float, const N: usize> {
     /// weighted coord
     pub coord: Option<[F; N]>,
     pub strength: Option<F>,
+    pub radius: Option<F>,
 }
 
 impl<F: Float + Send + Sync, const N: usize> Display for RegionForceData<F, N> {
@@ -85,6 +86,7 @@ impl<F: Float + Send + Sync, const N: usize> Default for RegionForceData<F, N> {
         Self {
             coord: None,
             strength: None,
+            radius: None,
         }
     }
 }
