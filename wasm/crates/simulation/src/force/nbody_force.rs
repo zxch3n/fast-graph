@@ -187,15 +187,15 @@ impl<
         // }
         // TODO 效率
         let herd = Herd::new();
-        let tree = GenericTree::<F, N, N2, ForceData<F, N, D>>::new_in_par(
+        let mut tree = GenericTree::<F, N, N2, ForceData<F, N, D>>::from_nodes(
             &herd,
             force_point_data
                 .iter_mut()
                 .map(|point_data| {
-                    herd.get().alloc(Node::new_point(
+                    Node::new_point(
                         point_data.coord,
                         PointForceData::from_point_data(point_data),
-                    ))
+                    )
                 })
                 .collect::<Vec<_>>(),
             // TODO 参数设置

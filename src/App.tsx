@@ -1,55 +1,56 @@
-import { useCallback, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-import { init, heavy_calc } from './wasm';
+import { Graph2D } from './wasmEntry';
 
-const promise = init();
+// init(1);
+const W = 500;
+const H = 500;
 function App() {
-  const [running, setRunning] = useState(false);
-  const callback = useCallback(async () => {
-    await promise;
-    setRunning(true);
-    await bench('single thread calc', async () => {
-      await heavy_calc(false);
-    });
+  const graph = useMemo(() => new Graph2D(100), []);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = canvas.current!.getContext('2d')!;
 
-    await bench('multi-thread calc', async () => {
-      await heavy_calc(true);
+    graph.init().then(() => {
+      draw();
+      graph.graph?.add_center_force();
+      graph.graph?.add_n_body_force('nbody');
     });
-    setRunning(false);
+    function draw() {
+      let positions = graph.positions;
+      if (!positions) {
+        return;
+      }
+
+      graph.tick(1);
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      ctx.fillStyle = '#000';
+      ctx.scale(0.1, 0.1);
+      let n = positions.length;
+      for (let i = 0; i < n; i += 2) {
+        const x = positions[i];
+        const y = positions[i + 1];
+        // draw a circle
+        ctx.beginPath();
+        ctx.arc(x, y, 20, 0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
+      requestAnimationFrame(draw);
+    }
+
+    return () => {
+      graph.dispose();
+    };
   }, []);
 
   return (
     <div className="App">
-      <header className="App-header">
-        <p>Hello Vite + React!</p>
-        <p>
-          <button type="button" onClick={callback}>
-            {running ? '...' : 'RUN'}
-          </button>
-        </p>
-        <p>
-          Edit <code>App.tsx</code> and save to test HMR updates.
-        </p>
-        <p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-          {' | '}
-          <a
-            className="App-link"
-            href="https://vitejs.dev/guide/features.html"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Vite Docs
-          </a>
-        </p>
-      </header>
+      <canvas width={W} height={H} ref={canvas} />
     </div>
   );
 }
