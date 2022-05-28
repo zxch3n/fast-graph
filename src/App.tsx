@@ -1,15 +1,15 @@
 import { useCallback, useState } from 'react';
 
-import { init, heavy_calc, findInside } from './wasm';
+import { init, findInside } from './wasm';
 
-const promise = init();
+const promise = init(4);
 const data = new Float64Array(new Array(1e4).fill(0).map((_) => Math.random()));
 function App() {
   const [running, setRunning] = useState(false);
   const callback = useCallback(async () => {
     await promise;
     setRunning(true);
-    await bench('single thread calc', async () => {
+    await bench('4 threads calc', async () => {
       await findInside(data, [0.5, 0.5]);
     });
 
