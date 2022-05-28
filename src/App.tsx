@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 
-import { Graph2D } from './wasmEntry';
+import { Graph2D } from './graph2d';
 
 // init(1);
 const W = 500;
