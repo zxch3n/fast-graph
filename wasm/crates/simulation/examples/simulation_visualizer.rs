@@ -2,22 +2,20 @@
 use plotters::coord::types::RangedCoordf32;
 use plotters::prelude::*;
 use rand::prelude::*;
-use simulation::force::{CenterForce, NBodyForce, PositionForce};
+use simulation::data::LinkData;
+use simulation::force::{CenterForce, LinkForce, NBodyForce, PositionForce};
 use simulation::Simulation;
 use std::fmt::{Display, Formatter};
 use std::time::Instant;
 
 #[derive(Clone)]
 struct RandomData {
-    data: Vec<i32>,
+    data: (),
 }
 
 impl Default for RandomData {
     fn default() -> Self {
-        let num = thread_rng().gen_range(3..20);
-        RandomData {
-            data: Vec::from_iter(0..num),
-        }
+        RandomData { data: () }
     }
 }
 
@@ -27,11 +25,23 @@ impl Display for RandomData {
     }
 }
 
-fn build_simulation<'s>(node_num: usize) -> Simulation<f64, 2, RandomData> {
-    let mut data = Vec::with_capacity(node_num);
-    for _ in 0..node_num {
-        data.push(RandomData::default())
+fn build_random_links(data: &[RandomData]) -> Vec<(usize, usize)> {
+    let mut links = Vec::new();
+    for (source_index, _) in data.iter().enumerate() {
+        if thread_rng().gen_range(0..10) == 0 {
+            for (target_index, _) in data.iter().enumerate() {
+                if source_index != target_index && thread_rng().gen_range(0..10) < 3 {
+                    links.push((source_index, target_index))
+                }
+            }
+        }
     }
+    links
+}
+
+fn build_simulation<'s>(node_num: usize) -> Simulation<f64, 2, RandomData> {
+    let mut data = vec![RandomData::default(); node_num];
+    let links = build_random_links(&data);
     let mut simulation: Simulation<f64, 2, RandomData> = Simulation::from_data(data);
     simulation.add_force(
         String::from("n-body"),
@@ -41,6 +51,9 @@ fn build_simulation<'s>(node_num: usize) -> Simulation<f64, 2, RandomData> {
     position_force.set_strength_fn(|_, _| [Some(1f64); 2]);
     simulation.add_force(String::from("position"), Box::new(position_force));
     simulation.add_force(String::from("center"), Box::new(CenterForce::default()));
+    let mut link_force = LinkForce::default();
+    link_force.set_links(links);
+    simulation.add_force(String::from("link"), Box::new(link_force));
     simulation
 }
 
