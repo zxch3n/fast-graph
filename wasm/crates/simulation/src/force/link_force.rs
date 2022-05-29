@@ -3,20 +3,18 @@ use crate::force::utils::{about_zero, jiggle};
 use crate::force::ForceSimulate;
 use num::Float;
 use std::cmp::min;
-use std::ops::{Index, IndexMut};
-use std::slice::from_raw_parts_mut;
 
 pub struct LinkForce<F: Float, const N: usize, D> {
     pub links: Vec<(usize, usize)>,
     links_data: Vec<LinkData<F, N, D>>,
     // FIXME &LinkForce<F, N, D>参数是否有更好的初始化办法    ->  使用Box<dyn Fn>？
-    pub strength_fn: fn(&LinkData<F, N, D>, &LinkForce<F, N, D>) -> F,
+    strength_fn: fn(&LinkData<F, N, D>, &LinkForce<F, N, D>) -> F,
     strengths: Vec<F>,
-    pub distance_fn: fn(&LinkData<F, N, D>, &[LinkData<F, N, D>]) -> F,
+    distance_fn: fn(&LinkData<F, N, D>, &[LinkData<F, N, D>]) -> F,
     distances: Vec<F>,
     count: Vec<usize>,
     bias: Vec<F>,
-    iterations: usize,
+    pub iterations: usize,
 }
 
 impl<F: Float, const N: usize, D> LinkForce<F, N, D> {
@@ -55,6 +53,26 @@ impl<F: Float, const N: usize, D> LinkForce<F, N, D> {
         self.links = links;
     }
 
+    pub fn set_strength_fn(
+        &mut self,
+        strength_fn: fn(&LinkData<F, N, D>, &LinkForce<F, N, D>) -> F,
+    ) {
+        self.strength_fn = strength_fn;
+        if self.strengths.len() > 0 {
+            self.init_strengths();
+        }
+    }
+
+    pub fn set_distance_fn(
+        &mut self,
+        distance_fn: fn(&LinkData<F, N, D>, &[LinkData<F, N, D>]) -> F,
+    ) {
+        self.distance_fn = distance_fn;
+        if self.distances.len() > 0 {
+            self.init_distances();
+        }
+    }
+
     pub fn count(&self) -> &[usize] {
         &self.count
     }
@@ -79,8 +97,8 @@ unsafe fn split_borrow_two_diff_index<F: Float, const N: usize, D>(
 ) -> (&mut PointData<F, N, D>, &mut PointData<F, N, D>) {
     assert_ne!(source_index, target_index);
     let ptr = data.as_mut_ptr();
-    let source = from_raw_parts_mut(ptr.add(source_index), 1).index_mut(0);
-    let target = from_raw_parts_mut(ptr.add(target_index), 1).index_mut(0);
+    let source = ptr.add(source_index).as_mut().unwrap();
+    let target = ptr.add(target_index).as_mut().unwrap();
     (source, target)
 }
 
@@ -128,7 +146,7 @@ impl<F: Float, const N: usize, D> ForceSimulate<F, N, D> for LinkForce<F, N, D> 
             for link in self.links_data.iter() {
                 let source_index = link.source().index;
                 let target_index = link.target().index;
-                // TODO find会不会效率问题？
+                // TODO find会不会效率问题？   如果依赖下标不变会好一些？
                 let (mut real_source_index, mut real_target_index) = (0, 0);
                 for (idx, force_point_datum) in force_point_data.iter().enumerate() {
                     if force_point_datum.index == source_index {

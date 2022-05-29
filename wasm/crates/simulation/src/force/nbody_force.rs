@@ -45,6 +45,32 @@ impl<
         D: Default + Display + Clone + Send + Sync,
     > NBodyForce<F, N, N2, D>
 {
+    pub fn new(
+        distance_min: F,
+        distance_max: F,
+        theta: F,
+        strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> F,
+    ) -> NBodyForce<F, N, N2, D> {
+        NBodyForce {
+            distance_min,
+            distance_max,
+            theta,
+            strength_fn,
+            strengths: Vec::new(),
+            force_point_data: None,
+        }
+    }
+
+    pub fn set_strength_fn(
+        &mut self,
+        strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> F,
+    ) {
+        self.strength_fn = strength_fn;
+        if let Some(force_point_data) = self.force_point_data {
+            unsafe { self.init(force_point_data.as_ref().unwrap()) }
+        }
+    }
+
     fn accumulate(&self, node: &mut Node<F, N, N2, ForceData<F, N, D>>) {
         if node.is_region() && !node.has_children() {
             return;
