@@ -3,8 +3,6 @@ use crate::force::utils::{about_zero, jiggle};
 use crate::force::ForceSimulate;
 use num::Float;
 use std::cmp::min;
-use std::ops::{Index, IndexMut};
-use std::slice::from_raw_parts_mut;
 
 pub struct LinkForce<F: Float, const N: usize, D> {
     pub links: Vec<(usize, usize)>,
@@ -79,8 +77,8 @@ unsafe fn split_borrow_two_diff_index<F: Float, const N: usize, D>(
 ) -> (&mut PointData<F, N, D>, &mut PointData<F, N, D>) {
     assert_ne!(source_index, target_index);
     let ptr = data.as_mut_ptr();
-    let source = from_raw_parts_mut(ptr.add(source_index), 1).index_mut(0);
-    let target = from_raw_parts_mut(ptr.add(target_index), 1).index_mut(0);
+    let source = ptr.add(source_index).as_mut().unwrap();
+    let target = ptr.add(target_index).as_mut().unwrap();
     (source, target)
 }
 
@@ -128,7 +126,7 @@ impl<F: Float, const N: usize, D> ForceSimulate<F, N, D> for LinkForce<F, N, D> 
             for link in self.links_data.iter() {
                 let source_index = link.source().index;
                 let target_index = link.target().index;
-                // TODO find会不会效率问题？
+                // TODO find会不会效率问题？   如果依赖下标不变会好一些？
                 let (mut real_source_index, mut real_target_index) = (0, 0);
                 for (idx, force_point_datum) in force_point_data.iter().enumerate() {
                     if force_point_datum.index == source_index {
