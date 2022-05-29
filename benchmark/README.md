@@ -12,7 +12,7 @@ Layout N nodes 0 edges smoothly, if N <= 1100.
 Layout N nodes N edges smoothly, if N <= 1100.
 Layout N nodes 0 edges smoothly, if N <= 1600.
 
-# Fast Graph
+# [Fast Graph](./basic/)
 
 Layout N nodes N edges smoothly, if N <= 3600.
 Layout N nodes 0 edges smoothly, if N <= 10000.
