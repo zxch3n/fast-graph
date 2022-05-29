@@ -1,55 +1,41 @@
-import { useCallback, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-import { init, heavy_calc } from './wasm';
+import { Graph2D } from './graph2d';
+import { genGraph } from './utils';
 
-const promise = init();
+// init(1);
+const W = 800;
+const H = 800;
+const graphData = genGraph(2000, 2000);
 function App() {
-  const [running, setRunning] = useState(false);
-  const callback = useCallback(async () => {
-    await promise;
-    setRunning(true);
-    await bench('single thread calc', async () => {
-      await heavy_calc(false);
-    });
+  const graph = useMemo(() => new Graph2D(), []);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = canvas.current!.getContext('2d')!;
 
-    await bench('multi-thread calc', async () => {
-      await heavy_calc(true);
+    graph.init().then(() => {
+      graph.setData(graphData);
+      draw();
     });
-    setRunning(false);
+    function draw() {
+      graph.tick(1);
+      graph.draw(ctx);
+      requestAnimationFrame(draw);
+    }
+
+    return () => {
+      graph.dispose();
+    };
   }, []);
 
   return (
     <div className="App">
-      <header className="App-header">
-        <p>Hello Vite + React!</p>
-        <p>
-          <button type="button" onClick={callback}>
-            {running ? '...' : 'RUN'}
-          </button>
-        </p>
-        <p>
-          Edit <code>App.tsx</code> and save to test HMR updates.
-        </p>
-        <p>
-          <a
-            className="App-link"
-            href="https://reactjs.org"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Learn React
-          </a>
-          {' | '}
-          <a
-            className="App-link"
-            href="https://vitejs.dev/guide/features.html"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Vite Docs
-          </a>
-        </p>
-      </header>
+      <canvas
+        width={W}
+        height={H}
+        ref={canvas}
+        style={{ width: W / 2, height: H / 2 }}
+      />
     </div>
   );
 }

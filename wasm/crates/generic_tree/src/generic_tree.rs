@@ -10,14 +10,19 @@ use num::Float;
 use crate::{tree_data::TreeData, Node};
 
 /// Bounds
-///
-///
-///
 #[derive(Clone, Copy, Debug)]
 pub struct Bound<F: Float> {
     pub min: F,
     pub max: F,
 }
+
+impl<F: Float> PartialEq for Bound<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.min == other.min && self.max == other.max
+    }
+}
+
+impl<F: Float> Eq for Bound<F> {}
 
 impl<F: Float + Display> Display for Bound<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -43,12 +48,13 @@ pub struct GenericTree<'bump, F: Float + Send + Sync, const N: usize, const N2: 
 {
     herd: &'bump Herd,
     root: &'bump mut Node<'bump, F, N, N2, D>,
+    /// 此树bounds
     bounds: [Bound<F>; N],
+    /// 当前节点数量
     pub num: u32,
+    /// 子节点间最小的距离
     min_dist: F,
-    /**
-     * leaf region max children
-     */
+    /// 叶子区域最大的子节点数量 leaf region max children
     leaf_max_children: u32,
 }
 
@@ -117,6 +123,8 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
 
         Ok(())
     }
+
+    /// 查询在`max_dist`范围内离point的最近节点
     pub fn find_closest_with_max_dist(
         &self,
         point: &[F; N],
@@ -141,7 +149,6 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
                             stack.push(&**child.as_ref().unwrap());
                         }
                     }
-
                     ()
                 }
             }
@@ -154,7 +161,8 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         self.find_closest_with_max_dist(point, F::infinity())
     }
 
-    pub fn visit_post_order<FF>(&mut self, mut func: FF)
+    /// 使用func: Fn(&Node<F, N, D>, usize)去后序遍历每一个节点
+    pub fn visit_post_order_mut<FF>(&mut self, mut func: FF)
     where
         FF: FnMut(&mut Node<'bump, F, N, N2, D>, usize) -> (),
     {
@@ -166,18 +174,24 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
                 continue;
             }
 
-            stack.push((node, depth, false));
-            match node {
-                Node::Point { .. } => {}
-                Node::Region { children, .. } => {
-                    for child in children.iter_mut().filter(|x| x.is_some()) {
-                        stack.push((*child.as_mut().unwrap(), depth + 1, true));
+            if node.is_region() {
+                stack.push((node, depth, false));
+                if let Node::Region { children, .. } = node {
+                    for child in children.iter_mut().rev() {
+                        if let Some(child) = child {
+                            stack.push((*child, depth + 1, true));
+                        }
                     }
                 }
+            } else {
+                func(node, depth)
             }
         }
     }
 
+    /// 使用func: Fn(&Node<F, N, D>, usize) -> bool去先序遍历每一个节点
+    ///
+    /// 如果func返回true，那么该节点的子节点不会被访问
     pub fn visit_pre_order<FF>(&self, func: FF) -> ()
     where
         FF: Fn(&Node<'bump, F, N, N2, D>, usize) -> bool,
@@ -185,7 +199,7 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         let mut stack = vec![(&self.root, 0)];
         while let Some((node, depth)) = stack.pop() {
             if func(&node, depth) {
-                return;
+                continue;
             }
 
             match node {
@@ -193,6 +207,31 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
                 Node::Region { children, .. } => {
                     for child in children.iter().filter(|x| x.is_some()) {
                         stack.push((&*child.as_ref().unwrap(), depth + 1));
+                    }
+                }
+            }
+        }
+    }
+
+    /// 使用func: Fn(&Node<F, N, D>, usize) -> bool去先序遍历每一个节点
+    ///
+    /// 如果func返回true，那么该节点的子节点不会被访问
+    pub fn visit_pre_order_mut<FF>(&mut self, mut func: FF) -> ()
+    where
+        FF: FnMut(&mut Node<'bump, F, N, N2, D>, usize) -> bool,
+    {
+        let mut stack = vec![(self.root as *mut _, 0)];
+        while let Some((node, depth)) = stack.pop() {
+            let node = unsafe { &mut *node };
+            if func(node, depth) {
+                continue;
+            }
+
+            match node {
+                Node::Point { coord: _, data: _ } => {}
+                Node::Region { children, .. } => {
+                    for child in children.iter_mut().filter(|x| x.is_some()) {
+                        stack.push((*child.as_mut().unwrap(), depth + 1));
                     }
                 }
             }
@@ -500,6 +539,7 @@ impl<'bump, F: Float + Sync + Send, const N: usize, const N2: usize, D: TreeData
 }
 
 impl<F: Float, const N: usize> Distance<F> for [F; N] {
+    //! 计算N维坐标间的距离
     fn dist(&self, another: &Self) -> F {
         let mut square_sum = F::zero();
         for i in 0..N {
@@ -511,12 +551,64 @@ impl<F: Float, const N: usize> Distance<F> for [F; N] {
 }
 
 mod tests {
+    use super::{Bound, GenericTree, Node};
+    use crate::tree_data::TreeData;
     use bumpalo_herd::Herd;
     use std::thread;
 
-    use crate::tree_data::TreeData;
+    #[test]
+    fn test_post_visit() {
+        let herd = Herd::new();
+        let mut tree: GenericTree<'_, f64, 2, 4, Data> = GenericTree::new(
+            &herd,
+            [
+                Bound {
+                    min: -1.0,
+                    max: 101.0,
+                },
+                Bound {
+                    min: -1.0,
+                    max: 101.0,
+                },
+            ],
+            0.1,
+            1,
+        );
 
-    use super::{Bound, GenericTree, Node};
+        for i in 0..100 {
+            tree.add([(i) as f64, (i) as f64], i).unwrap();
+            let mut visit_order = vec![];
+            tree.visit_post_order_mut(|node, _| match node {
+                Node::Point { coord, .. } => visit_order.push((Some(coord.clone()), None, 0)),
+                Node::Region {
+                    bounds, children, ..
+                } => visit_order.push((
+                    None,
+                    Some(bounds.clone()),
+                    children.into_iter().filter(|x| x.is_some()).count(),
+                )),
+            });
+
+            let mut visit_order_2 = vec![];
+            tree.root.visit_post_order(&mut |node| match node {
+                Node::Point { coord, .. } => {
+                    visit_order_2.push((Some(coord.clone()), None, 0));
+                }
+                Node::Region {
+                    bounds, children, ..
+                } => {
+                    visit_order_2.push((
+                        None,
+                        Some(bounds.clone()),
+                        children.into_iter().filter(|x| x.is_some()).count(),
+                    ));
+                }
+            });
+
+            assert_eq!(visit_order.len(), visit_order_2.len());
+            assert_eq!(visit_order, visit_order_2);
+        }
+    }
 
     struct Data;
     impl TreeData for Data {

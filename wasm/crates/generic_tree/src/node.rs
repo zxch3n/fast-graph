@@ -69,6 +69,13 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         }
     }
 
+    pub fn has_children(&self) -> bool {
+        match self {
+            Node::Point { coord: _, data: _ } => false,
+            Node::Region { children, .. } => children.iter().any(|child| child.is_some()),
+        }
+    }
+
     pub fn new_point(coord: [F; N], data: D::PointData) -> Self {
         Node::Point { coord, data }
     }
@@ -303,6 +310,13 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
         }
     }
 
+    pub fn region_data(&self) -> &D::RegionData {
+        match self {
+            Node::Region { data, .. } => data,
+            _ => panic!(),
+        }
+    }
+
     pub fn set_data(&mut self, value: D::PointData) {
         match self {
             Node::Point { coord: _, data } => {
@@ -310,6 +324,23 @@ impl<'bump, F: Float + Send + Sync, const N: usize, const N2: usize, D: TreeData
             }
             _ => panic!(),
         }
+    }
+
+    pub fn visit_post_order<FF>(&self, func: &mut FF)
+    where
+        FF: FnMut(&Self) -> (),
+    {
+        if self.is_region() {
+            if let Node::Region { children, .. } = self {
+                for child in children.iter() {
+                    if let Some(child) = child {
+                        child.visit_post_order(func);
+                    }
+                }
+            }
+        }
+
+        func(self);
     }
 
     #[cfg(not(debug_assertions))]
