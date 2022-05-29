@@ -8,13 +8,13 @@ pub struct LinkForce<F: Float, const N: usize, D> {
     pub links: Vec<(usize, usize)>,
     links_data: Vec<LinkData<F, N, D>>,
     // FIXME &LinkForce<F, N, D>参数是否有更好的初始化办法    ->  使用Box<dyn Fn>？
-    pub strength_fn: fn(&LinkData<F, N, D>, &LinkForce<F, N, D>) -> F,
+    strength_fn: fn(&LinkData<F, N, D>, &LinkForce<F, N, D>) -> F,
     strengths: Vec<F>,
-    pub distance_fn: fn(&LinkData<F, N, D>, &[LinkData<F, N, D>]) -> F,
+    distance_fn: fn(&LinkData<F, N, D>, &[LinkData<F, N, D>]) -> F,
     distances: Vec<F>,
     count: Vec<usize>,
     bias: Vec<F>,
-    iterations: usize,
+    pub iterations: usize,
 }
 
 impl<F: Float, const N: usize, D> LinkForce<F, N, D> {
@@ -51,6 +51,26 @@ impl<F: Float, const N: usize, D> LinkForce<F, N, D> {
 
     pub fn set_links(&mut self, links: Vec<(usize, usize)>) {
         self.links = links;
+    }
+
+    pub fn set_strength_fn(
+        &mut self,
+        strength_fn: fn(&LinkData<F, N, D>, &LinkForce<F, N, D>) -> F,
+    ) {
+        self.strength_fn = strength_fn;
+        if self.strengths.len() > 0 {
+            self.init_strengths();
+        }
+    }
+
+    pub fn set_distance_fn(
+        &mut self,
+        distance_fn: fn(&LinkData<F, N, D>, &[LinkData<F, N, D>]) -> F,
+    ) {
+        self.distance_fn = distance_fn;
+        if self.distances.len() > 0 {
+            self.init_distances();
+        }
     }
 
     pub fn count(&self) -> &[usize] {
