@@ -17,5 +17,5 @@ bumpalo = { version = "3.9.1", features=["collections", "boxed"] }
 bumpalo-herd = "0.1.1"
 getrandom = { version = "0.2", features = ["js"] }
 
-[profile.release.package.wasm]
-opt-level = 3
+# [profile.release.package.wasm]
+# opt-level = 3

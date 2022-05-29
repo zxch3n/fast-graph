@@ -8,7 +8,7 @@ lto = true
 codegen-units = 1
 #panic = "abort"
 
-[profile.release.package.wasm]
-opt-level = 3
+# [profile.release.package.wasm]
+# opt-level = 3
 #opt-level = "s"
 #debugging = true

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FPS } from '@zxch3n/fps';
 import { Graph2D } from '../../../src/graph2d';
+import { GraphData } from '../../../src/type';
 
-let graphData = createGraphData(1);
+let graphData = genGraph(1, 1);
 let fps = new FPS();
 function App() {
   const [show, setShow] = useState(false);
@@ -10,13 +11,14 @@ function App() {
   const [fpsNum, setFps] = useState<undefined | number>(undefined);
   useEffect(() => {
     const func = async () => {
-      for (let num = 100; num < 10000; num += 100) {
-        graphData = createGraphData(num);
+      for (let num = 4000; num < 20000; num += 1000) {
+        graphData = genGraph(num, num);
         fps = new FPS();
         setNum(num);
         setShow(true);
         await new Promise((r) => setTimeout(r, 1000));
         while (fps.fps == null) {
+          fps.start();
           await new Promise((r) => setTimeout(r, 1000));
         }
         if (fps.fps != null && fps.fps < 50) {
@@ -38,31 +40,64 @@ function App() {
     <div className="App">
       <p style={{ textAlign: 'center' }}>{num} Nodes</p>
       <p style={{ textAlign: 'center' }}>fps {fpsNum}</p>
-
       {show && <Graph />}
     </div>
   );
 }
 
+const W = 800;
+const H = 800;
 function Graph() {
-  const ref = useRef(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
+    const ctx = canvas.current!.getContext('2d')!;
     const graph = new Graph2D();
+    let stop = false;
+    graph.init().then(() => {
+      graph.setData(graphData);
+      fps.start();
+      draw();
+    });
+    function draw() {
+      if (stop) {
+        return;
+      }
+      graph.tick(1);
+      graph.draw(ctx);
+      requestAnimationFrame(draw);
+    }
 
-    graph.data(graphData);
-    graph.render();
-    fps.start();
     return () => {
-      graph.destroy();
+      stop = true;
+      graph.dispose();
     };
   }, []);
-  return <div ref={ref} id="container"></div>;
+  return (
+    <div id="container">
+      <canvas
+        width={W}
+        height={H}
+        ref={canvas}
+        style={{ width: W / 2, height: H / 2 }}
+      />
+    </div>
+  );
 }
 
-function createGraphData(N: number): GraphData {
+export function genGraph(node_num: number, edge_num: number): GraphData {
   return {
-    nodes: [...Array(N).keys()].map((i) => ({ id: i + '' })),
-    edges: [],
+    nodes: [...Array(node_num)].fill({}),
+    links: [...Array(edge_num)].map((_, i) => {
+      const from = i;
+      let to = (Math.random() * node_num) | 0;
+      if (to === from) {
+        to = (from + 1) % node_num;
+      }
+      return {
+        from,
+        to,
+      };
+    }),
   };
 }
 
