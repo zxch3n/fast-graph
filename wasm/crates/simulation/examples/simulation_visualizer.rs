@@ -1,6 +1,5 @@
 #![feature(ptr_internals)]
 use plotters::coord::types::RangedCoordf32;
-use plotters::coord::Shift;
 use plotters::element::*;
 use plotters::prelude::*;
 use rand::prelude::*;
@@ -44,18 +43,19 @@ fn build_simulation(
     data: Vec<RandomData>,
     links: Vec<(usize, usize)>,
 ) -> Simulation<f64, 2, RandomData> {
+    let data_len = data.len();
+    let link_len = links.len();
     let mut simulation: Simulation<f64, 2, RandomData> = Simulation::from_data(data);
     let mut nbody_force: NBodyForce<f64, 2, 4, RandomData> = NBodyForce::default();
-    nbody_force.set_strength_fn(|_, _| -50_f64);
+    nbody_force.strengths = vec![-50_f64; data_len];
     simulation.add_force(String::from("n-body"), Box::new(nbody_force));
-    let mut position_force = PositionForce::default();
-    position_force.set_strength_fn(|_, _| [Some(1f64); 2]);
+    let position_force = PositionForce::new(
+        vec![[Some(0_f64); 2]; data_len],
+        vec![[Some(1_f64); 2]; data_len],
+    );
     simulation.add_force(String::from("position"), Box::new(position_force));
     simulation.add_force(String::from("center"), Box::new(CenterForce::default()));
-    let mut link_force = LinkForce::default();
-    link_force.set_links(links);
-    link_force.set_distance_fn(|_, _| 0_f64);
-    link_force.set_strength_fn(|_, _| 1_f64);
+    let link_force = LinkForce::new(links, vec![1_f64; link_len], vec![0_f64; link_len], 1);
     simulation.add_force(String::from("link"), Box::new(link_force));
     simulation
 }
