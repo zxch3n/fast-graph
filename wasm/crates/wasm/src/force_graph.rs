@@ -25,8 +25,8 @@ impl Display for RandomData {
 
 #[wasm_bindgen]
 pub struct ForceGraph2D {
-    node_positions: Vec<(f64, f64)>,
-    simulation: Simulation<f64, 2, RandomData>,
+    node_positions: Vec<(f32, f32)>,
+    simulation: Simulation<f32, 2, RandomData>,
 }
 
 #[wasm_bindgen]
@@ -37,7 +37,7 @@ impl ForceGraph2D {
     //         data.push(RandomData::default())
     //     }
     //     let node_positions = vec![(0., 0.); node_num];
-    //     let mut simulation: Simulation<f64, 2, RandomData> = Simulation::from_data(data);
+    //     let mut simulation: Simulation<f32, 2, RandomData> = Simulation::from_data(data);
 
     //     let mut out = ForceGraph2D {
     //         node_positions,
@@ -54,7 +54,7 @@ impl ForceGraph2D {
             data.push(RandomData::default())
         }
         let node_positions = vec![(0., 0.); node_num];
-        let mut simulation: Simulation<f64, 2, RandomData> = Simulation::from_data(data);
+        let mut simulation: Simulation<f32, 2, RandomData> = Simulation::from_data(data);
         let mut link_force = LinkForce::default();
         let mut links = Vec::new();
         for i in (0..links_data.len()).step_by(2) {
@@ -73,9 +73,9 @@ impl ForceGraph2D {
     }
 
     pub fn add_n_body_force(&mut self) {
-        let mut nbody_force: NBodyForce<f64, 2, 4, RandomData> = NBodyForce::default();
-        nbody_force.distance_min = 10_f64;
-        nbody_force.set_strength_fn(|_, _| -1_f64);
+        let mut nbody_force: NBodyForce<f32, 2, 4, RandomData> = NBodyForce::default();
+        nbody_force.distance_min = 10_f32;
+        nbody_force.set_strength_fn(|_, _| -1_f32);
         self.simulation
             .add_force(String::from("official:n-body"), Box::new(nbody_force));
     }
@@ -104,7 +104,7 @@ impl ForceGraph2D {
         }
     }
 
-    pub fn get_pos(&self) -> *const (f64, f64) {
+    pub fn get_pos(&self) -> *const (f32, f32) {
         self.node_positions.as_ptr()
     }
 }

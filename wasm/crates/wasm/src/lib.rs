@@ -16,19 +16,19 @@ impl TreeData for Data {
 }
 
 #[wasm_bindgen]
-pub fn build_a_tree(input: &[f64], target: &[f64]) -> usize {
+pub fn build_a_tree(input: &[f32], target: &[f32]) -> usize {
     let herd = Herd::new();
     let mut nodes = vec![];
     let mem = herd.get();
     for i in (0..input.len()).step_by(2) {
-        nodes.push(mem.alloc(Node::<'_, f64, 2, 4, Data>::new_point(
+        nodes.push(mem.alloc(Node::<'_, f32, 2, 4, Data>::new_point(
             [input[i], input[i + 1]],
             i / 2,
         )));
     }
 
-    let tree = generic_tree::GenericTree::<'_, f64, 2, 4, Data>::new_in_par(&herd, nodes, 0.1, 3);
-    // let tree = generic_tree::GenericTree::<f64, 2, usize>::new_in_par(nodes, 0.1, 10);
+    let tree = generic_tree::GenericTree::<'_, f32, 2, 4, Data>::new_in_par(&herd, nodes, 0.1, 3);
+    // let tree = generic_tree::GenericTree::<f32, 2, usize>::new_in_par(nodes, 0.1, 10);
     let data = *tree.find_closest(&[target[0], target[1]]).unwrap().data();
     data
 }

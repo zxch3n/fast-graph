@@ -6,9 +6,9 @@ export async function init(threadNum = navigator.hardwareConcurrency) {
 }
 
 export function findInside(
-  inputCoords: Float64Array,
+  inputCoords: Float32Array,
   target: [number, number],
 ): number {
-  const _target = new Float64Array(target);
+  const _target = new Float32Array(target);
   return build_a_tree(inputCoords, _target);
 }

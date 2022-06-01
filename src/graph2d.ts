@@ -12,15 +12,15 @@ export async function init(threadNum = navigator.hardwareConcurrency) {
 }
 
 export function findInside(
-  inputCoords: Float64Array,
+  inputCoords: Float32Array,
   target: [number, number],
 ): number {
-  const _target = new Float64Array(target);
+  const _target = new Float32Array(target);
   return build_a_tree(inputCoords, _target);
 }
 
 export class Graph2D {
-  positions: Float64Array | undefined;
+  positions: Float32Array | undefined;
   public graph: ForceGraph2D | undefined;
   private memory: WebAssembly.Memory | undefined;
   private destroyed = false;
@@ -87,7 +87,7 @@ export class Graph2D {
       data.nodes.length,
       new Uint32Array(links),
     );
-    this.positions = new Float64Array(
+    this.positions = new Float32Array(
       this.memory!.buffer,
       this.graph!.get_pos(),
       data.nodes.length * 2,
