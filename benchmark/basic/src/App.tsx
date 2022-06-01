@@ -11,7 +11,7 @@ function App() {
   const [fpsNum, setFps] = useState<undefined | number>(undefined);
   useEffect(() => {
     const func = async () => {
-      for (let num = 4000; num < 20000; num += 1000) {
+      for (let num = 4000; num < 20000; num += 100) {
         graphData = genGraph(num, num);
         fps = new FPS();
         setNum(num);
