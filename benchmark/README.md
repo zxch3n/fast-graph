@@ -12,6 +12,14 @@ Layout N nodes 0 edges smoothly, if N <= 1100.
 Layout N nodes N edges smoothly, if N <= 1100.
 Layout N nodes 0 edges smoothly, if N <= 1600.
 
+# Sigma
+
+[StackBlitz Example](https://stackblitz.com/edit/force-graph-benchmark-vg4hgw)
+
+It's mainly testing underlying `graphology-layout-forceatlas2` algorithm
+
+Layout N nodes N edges smoothly, if N <= 1500.
+
 # [Fast Graph](./basic/)
 
 Layout N nodes N edges smoothly, if N <= 3600.
