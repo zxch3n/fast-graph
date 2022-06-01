@@ -3,7 +3,7 @@ use plotters::coord::types::RangedCoordf32;
 use plotters::element::*;
 use plotters::prelude::*;
 use rand::prelude::*;
-use simulation::force::{CenterForce, LinkForce, NBodyForce, PositionForce};
+use simulation::force::{CenterForce, CollideForce, LinkForce, NBodyForce, PositionForce};
 use simulation::Simulation;
 use std::fmt::{Display, Formatter};
 use std::time::Instant;
@@ -27,10 +27,10 @@ impl Display for RandomData {
 
 fn build_random_links(data: &[RandomData]) -> Vec<(usize, usize)> {
     let mut links = Vec::new();
-    for (source_index, _) in data.iter().enumerate() {
-        if thread_rng().gen_range(0..10) < 1 {
-            for (target_index, _) in data.iter().enumerate() {
-                if source_index != target_index && thread_rng().gen_range(0..10) < 1 {
+    for source_index in 0..data.len() {
+        if thread_rng().gen_range(0..15) < 1 {
+            for target_index in source_index..data.len() {
+                if source_index < target_index && thread_rng().gen_range(0..15) < 1 {
                     links.push((source_index, target_index))
                 }
             }
@@ -46,17 +46,30 @@ fn build_simulation(
     let data_len = data.len();
     let link_len = links.len();
     let mut simulation: Simulation<f64, 2, RandomData> = Simulation::from_data(data);
-    let mut nbody_force: NBodyForce<f64, 2, 4, RandomData> = NBodyForce::default();
-    nbody_force.strengths = vec![-50_f64; data_len];
+
+    // nbody force
+    let mut nbody_force: NBodyForce<f64, 2, 4, RandomData> = NBodyForce::new(0f64, 1e7f64, 0.9f64);
+    nbody_force.strengths = vec![-30_f64; data_len];
     simulation.add_force(String::from("n-body"), Box::new(nbody_force));
+
+    // position force
     let position_force = PositionForce::new(
         vec![[Some(0_f64); 2]; data_len],
         vec![[Some(1_f64); 2]; data_len],
     );
     simulation.add_force(String::from("position"), Box::new(position_force));
+
+    // center force
     simulation.add_force(String::from("center"), Box::new(CenterForce::default()));
+
+    // link force
     let link_force = LinkForce::new(links, vec![1_f64; link_len], vec![0_f64; link_len], 1);
     simulation.add_force(String::from("link"), Box::new(link_force));
+
+    // collide force
+    let collide_force: CollideForce<f64, 2, 4, RandomData> =
+        CollideForce::new(vec![2_f64; data_len], 0.6_f64, 1);
+    simulation.add_force(String::from("collide"), Box::new(collide_force));
     simulation
 }
 
@@ -66,12 +79,12 @@ fn draw_node(
 ) {
     let dot_and_label = |x: f32, y: f32| {
         return EmptyElement::at((x, y))
-            + Circle::new((0, 0), 3, ShapeStyle::from(&BLACK).filled())
-            + Text::new(
-                format!("({:.2},{:.2})", x, y),
-                (10, 0),
-                ("sans-serif", 15.0).into_font(),
-            );
+            + Circle::new((0, 0), 3, ShapeStyle::from(&BLACK).filled());
+        // + Text::new(
+        //     format!("({:.2},{:.2})", x, y),
+        //     (10, 0),
+        //     ("sans-serif", 15.0).into_font(),
+        // );
     };
     sim.force_point_data.iter().for_each(|data| {
         area.draw(&dot_and_label(data.coord[0] as f32, data.coord[1] as f32))
@@ -105,21 +118,21 @@ fn main() {
         .unwrap()
         .into_drawing_area();
     let mut chart = ChartBuilder::on(&area)
-        .build_cartesian_2d(-128f32..128f32, -128f32..128f32)
+        .build_cartesian_2d(-144f32..144f32, -144f32..144f32)
         .unwrap();
 
     let area = area.apply_coord_spec(Cartesian2d::<RangedCoordf32, RangedCoordf32>::new(
-        -128f32..128f32,
-        -128f32..128f32,
+        -144f32..144f32,
+        -144f32..144f32,
         (0..640, 0..640),
     ));
-    let node_num = 50;
+    let node_num = 100;
     let data = vec![RandomData::default(); node_num];
     let links = build_random_links(&data);
     let mut sim = build_simulation(data, links.clone());
     for i in 0..30 {
         println!("draw {}/30", i + 1);
-        area.fill(&RGBColor(240, 200, 200)).unwrap();
+        area.fill(&RGBColor(240, 144, 144)).unwrap();
         draw_node(&mut sim, &area);
         draw_line(&mut sim, links.clone(), &mut chart);
         area.present().unwrap();

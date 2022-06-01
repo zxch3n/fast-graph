@@ -1,8 +1,7 @@
 use crate::data::{ForceData, PointData, PointForceData};
-use crate::force::utils::{about_zero, jiggle};
+use crate::force::utils::{about_zero, jiggle, print_node_data};
 use crate::force::ForceSimulate;
 use bumpalo_herd::Herd;
-use core::panicking::panic;
 use generic_tree::{GenericTree, Node};
 use num::Float;
 use std::fmt::Display;
@@ -36,25 +35,28 @@ impl<
                 data.radius = self.radius[data.index];
             }
             Node::Region { data, children, .. } => {
-                if let Some(r_radius) = data.radius {
-                    for child in children.iter_mut().filter(|x| x.is_some()) {
-                        let child_node = &*child.as_mut().unwrap();
-                        match child_node {
-                            Node::Point { data: p_data, .. } => {
-                                if p_data.radius > r_radius {
-                                    data.radius = Some(p_data.radius)
+                let mut r_radius = match data.radius {
+                    Some(rr) => rr,
+                    None => F::zero(),
+                };
+                for child in children.iter_mut().filter(|x| x.is_some()) {
+                    let child_node = &*child.as_mut().unwrap();
+                    match child_node {
+                        Node::Point { data: p_data, .. } => {
+                            if p_data.radius > r_radius {
+                                r_radius = p_data.radius
+                            }
+                        }
+                        Node::Region { data: r_data, .. } => {
+                            if let Some(rr_radius) = r_data.radius {
+                                if rr_radius > r_radius {
+                                    r_radius = rr_radius
                                 }
                             }
-                            Node::Region { data: r_data, .. } => {
-                                if let Some(rr_radius) = r_data.radius {
-                                    if rr_radius > r_radius {
-                                        data.radius = Some(rr_radius)
-                                    }
-                                }
-                            }
-                        };
-                    }
+                        }
+                    };
                 }
+                data.radius = Some(r_radius);
             }
         }
     }
@@ -71,7 +73,7 @@ impl<
         let mut rnd = rand::thread_rng();
         let ri = self.radius[point_data.index];
         let ri2 = ri * ri;
-        let rj = match node {
+        let mut rj = match node {
             Node::Point { data, .. } => data.radius,
             Node::Region { data, .. } => data.radius.unwrap(),
         };
@@ -80,7 +82,6 @@ impl<
         for i in 0..N {
             cn[i] = cn[i] + point_data.coord[i] + point_data.velocity[i]
         }
-
         if !node.is_region() {
             // Point
             let data: &PointData<F, N, D> = node.data();
@@ -114,9 +115,9 @@ impl<
             return false;
         }
 
-        return (0..N).fold(true, |b, i| {
-            b || (node.bounds()[i].min > cn[i] + r) || (node.bounds()[i].max > cn[i] - r)
-        });
+        (0..N).fold(false, |b, i| {
+            b || (node.bounds()[i].min > cn[i] + r) || (node.bounds()[i].max < cn[i] - r)
+        })
     }
 }
 
