@@ -20,6 +20,12 @@ It's mainly testing underlying `graphology-layout-forceatlas2` algorithm
 
 Layout N nodes N edges smoothly, if N <= 1500.
 
+# ECharts
+
+[StackBlitz Example](https://stackblitz.com/edit/force-graph-benchmark-q5bshu)
+
+Layout N nodes N edges smoothly, if N <= 1700.
+
 # [Fast Graph](./basic/)
 
 Layout N nodes N edges smoothly, if N <= 3600.
