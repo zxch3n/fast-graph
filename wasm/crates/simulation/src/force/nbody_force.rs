@@ -10,22 +10,8 @@ pub struct NBodyForce<F: Float, const N: usize, const N2: usize, D> {
     pub distance_min: F,
     pub distance_max: F,
     pub theta: F,
-    pub strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> F,
-    strengths: Vec<F>,
+    pub strengths: Vec<F>,
     force_point_data: Option<*const [PointData<F, N, D>]>,
-}
-
-impl<F: Float, const N: usize, const N2: usize, D> Default for NBodyForce<F, N, N2, D> {
-    fn default() -> Self {
-        NBodyForce {
-            distance_min: F::from(0_f64).unwrap(),
-            distance_max: F::infinity(),
-            theta: F::from(0.9_f64).unwrap(),
-            strength_fn: |_, _| F::from(-30_f64).unwrap(),
-            strengths: Vec::new(),
-            force_point_data: None,
-        }
-    }
 }
 
 impl<F: Float, const N: usize, const N2: usize, D> Debug for NBodyForce<F, N, N2, D> {
@@ -45,29 +31,13 @@ impl<
         D: Default + Display + Clone + Send + Sync,
     > NBodyForce<F, N, N2, D>
 {
-    pub fn new(
-        distance_min: F,
-        distance_max: F,
-        theta: F,
-        strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> F,
-    ) -> NBodyForce<F, N, N2, D> {
+    pub fn new(distance_min: F, distance_max: F, theta: F) -> NBodyForce<F, N, N2, D> {
         NBodyForce {
             distance_min,
             distance_max,
             theta,
-            strength_fn,
             strengths: Vec::new(),
             force_point_data: None,
-        }
-    }
-
-    pub fn set_strength_fn(
-        &mut self,
-        strength_fn: fn(&PointData<F, N, D>, &[PointData<F, N, D>]) -> F,
-    ) {
-        self.strength_fn = strength_fn;
-        if let Some(force_point_data) = self.force_point_data {
-            unsafe { self.init(force_point_data.as_ref().unwrap()) }
         }
     }
 
@@ -86,8 +56,10 @@ impl<
                 for child in children.iter_mut().filter(|x| x.is_some()) {
                     let child_node = &*child.as_mut().unwrap();
                     let (_strength, _coord) = match child_node {
-                        Node::Point { data, .. } => (Some(data.strength), Some(data.coord)),
-                        Node::Region { data, .. } => (data.strength, data.coord),
+                        Node::Point { data: p_data, .. } => {
+                            (Some(p_data.strength), Some(p_data.coord))
+                        }
+                        Node::Region { data: r_data, .. } => (r_data.strength, r_data.coord),
                     };
                     if let (Some(_strength), Some(_coord)) = (_strength, _coord) {
                         let c = _strength.abs();
@@ -181,17 +153,6 @@ impl<
             true
         }
     }
-
-    fn _set_strength(&mut self) {
-        if let Some(force_point_data) = self.force_point_data {
-            unsafe {
-                (&*force_point_data).iter().for_each(|point_data| {
-                    self.strengths[point_data.index] =
-                        (self.strength_fn)(point_data, &*force_point_data)
-                })
-            }
-        }
-    }
 }
 
 impl<
@@ -203,14 +164,9 @@ impl<
 {
     fn init(&mut self, force_point_data: &[PointData<F, N, D>]) {
         self.force_point_data = Some(force_point_data as *const [PointData<F, N, D>]);
-        self.strengths = vec![F::zero(); force_point_data.len()];
-        self._set_strength()
     }
 
     fn force(&self, force_point_data: &mut [PointData<F, N, D>], alpha: F) {
-        // for point_data in force_point_data.iter() {
-        //     println!("更新前数据 {}", point_data)
-        // }
         // TODO 效率
         let herd = Herd::new();
         let mut tree = GenericTree::<F, N, N2, ForceData<F, N, D>>::from_nodes(
@@ -232,8 +188,5 @@ impl<
         for point_data in force_point_data.iter_mut() {
             tree.visit_pre_order_mut(|node, _| self.apply(point_data, node, alpha));
         }
-        // for point_data in force_point_data.iter() {
-        //     println!("更新后数据 {}", point_data)
-        // }
     }
 }
